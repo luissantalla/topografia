@@ -1,0 +1,4849 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>LAS → DXF · Topografía</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Barlow:wght@400;500;600;700&display=swap');
+:root{
+  --bg:#0d0f0e;--panel:#131614;--border:#232825;
+  --amber:#e8a020;--amber2:#c47b10;
+  --green:#3ecf6a;--red:#e85050;--blue:#4ab4e8;--purple:#b06cdb;
+  --muted:#7a9278;--text:#c8cfc6;--bright:#eef2ec;
+  --mono:'Share Tech Mono',monospace;--sans:'Arial',sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font-family:var(--sans);font-weight:600;height:100vh;display:flex;flex-direction:column;overflow:hidden}
+/* ── HEADER ── */
+header{border-bottom:1px solid var(--border);padding:7px 16px;display:flex;align-items:center;gap:10px;background:var(--panel);flex-shrink:0}
+header h1{font-family:var(--mono);font-size:.88rem;color:var(--amber);letter-spacing:.08em;white-space:nowrap}
+header .sub{font-size:.8rem;color:var(--muted);letter-spacing:.03em;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hbtn{font-family:var(--mono);font-size:.67rem;letter-spacing:.05em;text-transform:uppercase;border:none;border-radius:3px;cursor:pointer;padding:5px 10px;transition:all .12s;white-space:nowrap;font-weight:600}
+.hbtn:disabled{opacity:.3;cursor:not-allowed}
+#hbtn-undo{background:transparent;color:var(--muted);border:1px solid var(--border)}
+#hbtn-undo:not(:disabled){color:var(--text);border-color:var(--muted)}
+#hbtn-undo:not(:disabled):hover{background:rgba(255,255,255,.05)}
+#hbtn-export{background:var(--amber);color:#0d0f0e;font-weight:700}
+#hbtn-export:not(:disabled):hover{background:var(--amber2)}
+#hbtn-export:disabled{background:transparent;color:var(--muted);border:1px solid var(--border)}
+main{flex:1;display:grid;grid-template-columns:268px 1fr;overflow:hidden}
+/* ── SIDEBAR ── */
+aside{border-right:1px solid var(--border);overflow-y:auto;display:flex;flex-direction:column;font-size:.88rem;overflow:hidden}
+aside .sidebar-scroll{flex:1;overflow-y:auto;display:flex;flex-direction:column}
+.sidebar-footer{border-top:2px solid var(--border);padding:10px 14px;background:var(--panel);display:flex;flex-direction:column;gap:5px;flex-shrink:0}
+::-webkit-scrollbar{width:3px}
+::-webkit-scrollbar-thumb{background:var(--border)}
+details{border-bottom:1px solid var(--border)}
+details>summary{list-style:none;display:flex;align-items:center;gap:7px;padding:9px 14px;cursor:pointer;user-select:none;font-family:var(--sans);font-size:.78rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;transition:color .12s}
+details>summary::-webkit-details-marker{display:none}
+details>summary::before{content:'▶';font-size:.52rem;color:var(--border);transition:transform .15s,color .15s;flex-shrink:0}
+details[open]>summary::before{transform:rotate(90deg);color:var(--amber)}
+details>summary:hover{color:var(--text)}
+details>summary .sdot{width:6px;height:6px;border-radius:50%;flex-shrink:0}
+.sec-body{padding:10px 14px}
+.sec{border-bottom:1px solid var(--border);padding:10px 14px}
+.stitle{font-family:var(--sans);font-size:.78rem;font-weight:700;color:var(--amber);letter-spacing:.06em;text-transform:uppercase;margin-bottom:8px;display:flex;align-items:center;gap:6px}
+.stitle::before{content:'';width:6px;height:6px;background:var(--amber);border-radius:50%;flex-shrink:0}
+/* Drop zones */
+#dropzone{border:2px dashed var(--border);border-radius:4px;padding:10px 8px;text-align:center;cursor:pointer;transition:all .2s}
+#dropzone:hover,#dropzone.over{border-color:var(--amber);background:rgba(232,160,32,.04)}
+#dropzone input{display:none}
+#dropzone .ico{font-size:1.2rem;margin-bottom:3px;display:block}
+#dropzone p{font-size:.85rem;color:var(--muted);line-height:1.5}
+#dropzone strong{color:var(--amber)}
+#las-loaded{display:none;align-items:center;gap:8px;padding:6px 9px;background:rgba(232,160,32,.06);border:1px solid rgba(232,160,32,.2);border-radius:3px;font-family:var(--mono);font-size:.8rem;color:var(--amber)}
+#las-loaded .lfile{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#las-clear{background:none;border:none;color:var(--muted);cursor:pointer;font-size:.78rem;padding:1px 4px}
+#las-clear:hover{color:var(--red)}
+#dropzone2{border:2px dashed var(--border);border-radius:4px;padding:9px 8px;text-align:center;cursor:pointer;transition:all .2s}
+#dropzone2:hover,#dropzone2.over{border-color:#f97316;background:rgba(249,115,22,.04)}
+#dropzone2 input{display:none}
+#dropzone2 p{font-size:.85rem;color:var(--muted);line-height:1.4}
+#dropzone2 strong{color:#f97316}
+#dxf-status{font-family:var(--mono);font-size:.78rem;margin-top:5px;padding:3px 7px;border-radius:3px;display:none}
+#dxf-status.ok{background:rgba(249,115,22,.1);color:#f97316;border:1px solid rgba(249,115,22,.3)}
+#dxf-status.err{background:rgba(232,80,80,.1);color:var(--red);border:1px solid rgba(232,80,80,.2)}
+.dxf-row{display:flex;align-items:center;gap:7px;margin-top:5px;font-size:.83rem;color:var(--muted)}
+.dxf-dot{width:7px;height:7px;border-radius:50%;background:#f97316;flex-shrink:0}
+/* Stats */
+.sgrid{display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-bottom:6px}
+.sv{background:rgba(255,255,255,.03);border:1px solid var(--border);border-radius:3px;padding:5px 8px}
+.sv span:first-child{font-family:var(--mono);font-size:.8rem;color:var(--bright);font-weight:600;display:block}
+.sv span:last-child{font-size:.73rem;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
+/* Classes */
+.clst{display:flex;flex-direction:column;gap:3px}
+.cli{display:flex;align-items:center;gap:6px;padding:5px 7px;border:1px solid var(--border);border-radius:3px;cursor:pointer;transition:border-color .12s;font-size:.71rem;user-select:none}
+.cli:hover{border-color:var(--muted)}
+.cli.on{border-color:var(--amber);background:rgba(232,160,32,.04)}
+.cd{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+.cn{flex:1;font-weight:600}
+.cc{font-family:var(--mono);font-size:.76rem;color:var(--muted)}
+.cb{font-size:.73rem;padding:1px 4px;border-radius:2px;font-weight:700}
+.bt{background:rgba(62,207,106,.13);color:var(--green)}
+.be{background:rgba(232,80,80,.13);color:var(--red)}
+.bv{background:rgba(74,180,232,.13);color:var(--blue)}
+/* Controls */
+.ctrl{margin-bottom:7px}
+.ctrl label{display:block;font-size:.76rem;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:3px;font-weight:600}
+.ctrl input{width:100%;background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:3px;color:var(--bright);font-family:var(--mono);font-size:.8rem;padding:5px 7px;outline:none;transition:border-color .12s}
+.ctrl input:focus{border-color:var(--amber)}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:5px}
+.hint{font-size:.77rem;color:var(--muted);margin-top:3px;line-height:1.5}
+/* Buttons */
+.btn{display:block;width:100%;padding:6px;font-family:var(--mono);font-size:.83rem;letter-spacing:.06em;text-transform:uppercase;border:none;border-radius:3px;cursor:pointer;transition:all .12s;margin-bottom:4px;font-weight:600}
+.btn:disabled{opacity:.3;cursor:not-allowed}
+.btp{background:var(--amber);color:#0d0f0e;font-weight:700}
+.btp:not(:disabled):hover{background:var(--amber2)}
+.bts{background:transparent;color:var(--amber);border:1px solid var(--amber)}
+.bts:not(:disabled):hover{background:rgba(232,160,32,.07)}
+.btb{background:transparent;color:var(--blue);border:1px solid var(--blue)}
+.btb:not(:disabled):hover{background:rgba(74,180,232,.07)}
+.btc{background:transparent;color:var(--purple);border:1px solid var(--purple)}
+.btc:not(:disabled):hover{background:rgba(176,108,219,.07)}
+.btc.active{background:rgba(176,108,219,.13)}
+/* Phase badges */
+.ph{display:inline-flex;align-items:center;gap:4px;font-family:var(--mono);font-size:.73rem;letter-spacing:.06em;text-transform:uppercase;padding:2px 6px;border-radius:2px;margin-bottom:6px}
+.ph2{background:rgba(232,160,32,.1);color:var(--amber);border:1px solid rgba(232,160,32,.2)}
+.ph3{background:rgba(62,207,106,.1);color:var(--green);border:1px solid rgba(62,207,106,.2)}
+/* Crop info */
+#crop-info{display:none;background:rgba(176,108,219,.07);border:1px solid rgba(176,108,219,.25);border-radius:3px;padding:5px 8px;font-family:var(--mono);font-size:.78rem;color:var(--purple);line-height:1.7;margin-bottom:5px;font-weight:600}
+/* Progress */
+#prog-wrap{display:none;margin-bottom:7px}
+#prog-bg{height:2px;background:var(--border);border-radius:1px;overflow:hidden;margin-bottom:4px}
+#prog-bar{height:100%;background:var(--amber);width:0%;transition:width .12s}
+#prog-msg{font-family:var(--mono);font-size:.61rem;color:var(--muted)}
+/* Measure result */
+#measure-result{display:none;margin-top:6px;font-family:var(--mono);font-size:.78rem;line-height:1.85;color:var(--bright);font-weight:600;background:rgba(255,255,255,.03);border:1px solid var(--border);border-radius:3px;padding:6px 9px}
+#measure-copy{display:none;width:100%;margin-top:4px;padding:4px;font-family:var(--mono);font-size:.76rem;letter-spacing:.05em;text-transform:uppercase;font-weight:600;cursor:pointer;background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:3px;color:var(--muted);transition:all .12s}
+#measure-copy:hover{border-color:var(--muted);color:var(--text)}
+/* ── CANVAS ── */
+#cv-wrap{background:#060807;position:relative;overflow:hidden;display:flex;align-items:center;justify-content:center}
+#preview-canvas{display:none;position:absolute;top:0;left:0;width:100%;height:100%}
+#placeholder{text-align:center;color:var(--muted)}
+#placeholder .big{font-size:3rem;opacity:.2;margin-bottom:10px}
+#placeholder p{font-size:.78rem;line-height:1.9;font-weight:600}
+#legend{position:absolute;bottom:10px;right:10px;background:rgba(6,8,7,.9);border:1px solid var(--border);border-radius:3px;padding:8px 12px;font-size:.64rem;font-weight:600;display:none;flex-direction:column;gap:5px}
+.li{display:flex;align-items:center;gap:7px}
+.lc{width:16px;height:2px;border-radius:1px}
+#infobar{position:absolute;top:10px;left:10px;font-family:var(--mono);font-size:.61rem;font-weight:600;color:var(--text);background:rgba(6,8,7,.87);padding:4px 8px;border-radius:3px;display:none;pointer-events:none}
+#logbar{position:absolute;bottom:38px;left:10px;font-family:var(--mono);font-size:.77rem;font-weight:600;color:var(--green);background:rgba(6,8,7,.87);padding:4px 9px;border-radius:3px;max-width:400px;display:none;pointer-events:none}
+#croplabel{position:absolute;pointer-events:none;font-family:var(--mono);font-size:.61rem;font-weight:600;color:rgba(176,108,219,.95);background:rgba(6,8,7,.8);padding:2px 6px;border-radius:2px;display:none;white-space:nowrap}
+#coordbar{position:absolute;bottom:0;left:0;right:0;font-family:var(--mono);font-size:.68rem;font-weight:600;color:var(--text);background:rgba(6,8,7,.92);border-top:1px solid var(--border);padding:5px 12px;pointer-events:none;white-space:nowrap;display:none;display:flex;align-items:center;gap:10px}
+#coord-search{display:none;align-items:center;gap:5px;pointer-events:all;margin-left:auto}
+#coord-input{background:transparent;border:none;border-left:1px solid var(--border);color:var(--bright);font-family:var(--mono);font-size:.67rem;font-weight:600;padding:2px 8px;outline:none;width:220px}
+#coord-input:focus{color:var(--amber)}
+#coord-input::placeholder{color:var(--muted)}
+#coord-go{background:rgba(232,160,32,.18);border:1px solid rgba(232,160,32,.35);border-radius:3px;color:var(--amber);font-family:var(--mono);font-size:.65rem;font-weight:700;padding:3px 9px;cursor:pointer;transition:all .12s}
+#coord-go:hover{background:rgba(232,160,32,.32)}
+</style>
+</head>
+<body>
+<header>
+  <h1>LAS → DXF</h1>
+  <span class="sub">NUBE DE PUNTOS · PARCELAS DXF · RECORTE · CURVAS DE NIVEL</span>
+</header>
+<main>
+<aside>
+<div class="sidebar-scroll">
+
+  <!-- LAS file -->
+  <div class="sec">
+    <div id="dropzone">
+      <input type="file" id="file-input" accept=".las">
+      <span class="ico">📡</span>
+      <p>Arrastra un <strong>.LAS</strong> o haz clic</p>
+    </div>
+    <div id="las-loaded">
+      <span class="lfile" id="las-name">—</span>
+      <button id="las-clear" title="Quitar archivo">✕</button>
+    </div>
+  </div>
+
+  <!-- Catastro DXF — colapsable -->
+  <details id="sec-dxf">
+    <summary><span class="sdot" style="background:#f97316"></span>Catastro .DXF</summary>
+    <div class="sec-body">
+      <div id="dropzone2">
+        <input type="file" id="file-input2" accept=".dxf,.DXF">
+        <p>Arrastra un <strong>.DXF</strong> o haz clic</p>
+      </div>
+      <div id="dxf-status"></div>
+      <div class="dxf-row" id="dxf-info" style="display:none">
+        <div class="dxf-dot"></div>
+        <span id="dxf-desc" style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">—</span>
+        <button class="btn btb" id="btn-dxf-clear" style="padding:2px 7px;font-size:.77rem;width:auto;margin:0">✕</button>
+      </div>
+      <p class="hint" style="margin-top:5px">Visualizado en naranja · incluido en el DXF exportado.</p>
+    </div>
+  </details>
+
+  <!-- Vista previa — colapsable, cerrado por defecto -->
+  <details id="sec-preview" style="display:none">
+    <summary><span class="sdot" style="background:var(--blue)"></span>Vista previa LAS</summary>
+    <div class="sec-body">
+      <div class="sgrid" id="sgrid"></div>
+      <p class="hint" id="sample-note"></p>
+    </div>
+  </details>
+
+  <!-- Recorte — siempre visible -->
+  <div class="sec" id="sec-crop" style="display:none">
+    <div class="ph ph2">◧ Recorte</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-bottom:5px">
+      <button class="btn btc" id="btn-crop-rect" style="font-size:.78rem;padding:5px 3px;margin:0">✂ Rectangular</button>
+      <button class="btn btc" id="btn-crop-poly" style="font-size:.78rem;padding:5px 3px;margin:0">⬡ Poligonal</button>
+    </div>
+    <p class="hint" id="crop-hint" style="margin-bottom:5px;display:none"></p>
+    <div id="crop-info"></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px">
+      <button class="btn btb" id="btn-crop-clear" disabled style="margin:0">✕ Quitar</button>
+      <button class="btn" id="btn-reset-view" style="background:transparent;color:var(--muted);border:1px solid var(--border);margin:0;display:none">↺ Original</button>
+    </div>
+  </div>
+
+  <!-- Medición — siempre visible -->
+  <div class="sec" id="sec-measure" style="display:none">
+    <div class="ph ph2" style="background:rgba(74,180,232,.08);color:var(--blue);border-color:rgba(74,180,232,.2)">📐 Medición</div>
+    <button class="btn btb" id="btn-measure" style="margin-bottom:3px">Medir distancia / área</button>
+    <p class="hint">Clic · Doble clic o clic dcho para cerrar · Esc cancela</p>
+    <div id="measure-result"></div>
+    <button id="measure-copy">⎘ Copiar resultados</button>
+  </div>
+
+  <!-- Clases — colapsable, abierto por defecto -->
+  <details id="sec-classes" style="display:none" open>
+    <summary><span class="sdot" style="background:var(--amber)"></span>Clases detectadas</summary>
+    <div class="sec-body">
+      <div class="clst" id="clst"></div>
+    </div>
+  </details>
+
+  <!-- Proceso — siempre visible -->
+  <div class="sec" id="sec-params" style="display:none">
+    <div class="ph ph3">▶ Proceso</div>
+    <div class="row2" style="margin-bottom:6px">
+      <div class="ctrl" style="margin:0">
+        <label>Equidist. (m)</label>
+        <input type="number" id="equid" value="1" min="0.1" step="0.1">
+      </div>
+      <div class="ctrl" style="margin:0">
+        <label>Resoluc. (m)</label>
+        <input type="number" id="resolution" value="2" min="0.5" step="0.5">
+      </div>
+    </div>
+    <div class="ctrl">
+      <label>Suavizado (pasadas)</label>
+      <input type="number" id="smoothing" value="3" min="0" max="10">
+    </div>
+    <div id="prog-wrap">
+      <div id="prog-bg"><div id="prog-bar"></div></div>
+      <div id="prog-msg">Procesando...</div>
+    </div>
+    <button class="btn btp" id="btn-process" disabled>▶  Generar curvas de nivel</button>
+  </div>
+
+</div><!-- /sidebar-scroll -->
+<div class="sidebar-footer">
+  <button class="btn btp" id="hbtn-export" disabled style="margin:0">⬇  Exportar DXF</button>
+  <button class="btn" id="hbtn-undo" disabled style="background:transparent;color:var(--muted);border:1px solid var(--border);margin:0">↩  Deshacer (0/2)</button>
+</div>
+</aside>
+
+<div id="cv-wrap">
+  <div id="placeholder"><div class="big">◎</div><p>Carga un archivo .LAS<br>para previsualizar la nube de puntos</p></div>
+  <canvas id="preview-canvas"></canvas>
+  <div id="legend">
+    <div class="li"><div class="lc" style="background:#3ecf6a"></div><span>Curvas normales</span></div>
+    <div class="li"><div class="lc" style="background:#e8a020"></div><span>Curvas maestras</span></div>
+    <div class="li"><div class="lc" style="background:#e85050"></div><span>Edificación</span></div>
+    <div class="li"><div class="lc" style="background:#4ab4e8"></div><span>Vegetación</span></div>
+    <div class="li" id="legend-parcel" style="display:none"><div class="lc" style="background:#f97316"></div><span>Parcelas</span></div>
+  </div>
+  <div id="infobar"></div>
+  <div id="logbar"></div>
+  <div id="croplabel"></div>
+  <div id="coordbar">
+    <span id="coord-xy">Mueve el ratón sobre el mapa</span>
+    <div id="coord-search">
+      <input id="coord-input" placeholder="Ir a X, Y …" spellcheck="false">
+      <button id="coord-go">IR →</button>
+    </div>
+  </div>
+</div>
+</main>
+
+<script>
+'use strict';
+
+// ══════════════════════════════════════════════
+// ESTADO
+// ══════════════════════════════════════════════
+const S = {
+  file:null, header:null,
+  previewPts:null, classCounts:{}, selectedCls:new Set(),
+  crop:null, cropPoly:null,          // cropPoly = [{x,y}] para recorte poligonal
+  tool:null,                          // 'cropRect'|'cropPoly'|'measure'|null
+  cropDrag:null, cropPolyPts:[],      // puntos en construcción del polígono
+  measurePts:[],                      // [{x,y,z}] puntos medición
+  measureClosed:false,
+  contours:[], buildPts:[], vegPts:[],
+  gd:null,                            // grid guardado para interpolación Z
+  bounds:null,
+  vs:1, vox:40, voy:40, vpad:40, cW:0, cH:0,
+  bgOpacity:0.7,
+  dxfString:null,
+  history:[],
+  dxfParcels:[],
+};
+
+// Definición de clases LAS
+const CLS={
+  0:{n:'Never classified',r:null,c:'#333'},
+  1:{n:'Unassigned',r:null,c:'#444'},
+  2:{n:'Suelo / Terreno',r:'t',c:'#6ed488'},
+  3:{n:'Vegetación baja',r:'v',c:'#4ab4e8'},
+  4:{n:'Vegetación media',r:'v',c:'#3a9fd0'},
+  5:{n:'Vegetación alta',r:'v',c:'#2a88b8'},
+  6:{n:'Edificación',r:'e',c:'#e85050'},
+  7:{n:'Ruido bajo',r:null,c:'#222'},
+  9:{n:'Agua',r:null,c:'#6699cc'},
+  10:{n:'Carril',r:null,c:'#998877'},
+  11:{n:'Vial',r:null,c:'#aa9988'},
+  17:{n:'Puente',r:null,c:'#cc8844'},
+  18:{n:'Ruido alto',r:null,c:'#111'},
+};
+const ci=c=>CLS[c]||{n:`Clase ${c}`,r:null,c:'#555'};
+
+// ══════════════════════════════════════════════
+// ══════════════════════════════════════════════
+// PARSER DXF — PARCELAS DE CATASTRO
+// ══════════════════════════════════════════════
+
+// Lee un DXF y extrae todas las entidades geométricas.
+// Soporta: LWPOLYLINE, LINE, POLYLINE+VERTEX, ARC, CIRCLE.
+function parseDXFParcels(text){
+  const lines=text.split(/\r?\n/);
+  const entities=[];
+  let i=0;
+  // Avanzar hasta sección ENTITIES
+  while(i<lines.length-1){
+    if(lines[i].trim()==='2'&&lines[i+1].trim()==='ENTITIES')break;
+    i++;
+  }
+  function nextPair(){const c=lines[i]?.trim(),v=lines[i+1]?.trim();i+=2;return[c,v];}
+  function peekCode(){return lines[i]?.trim();}
+
+  while(i<lines.length-1){
+    const[code,val]=nextPair();
+    if(code!=='0')continue;
+    if(val==='ENDSEC'||val==='EOF')break;
+
+    if(val==='LWPOLYLINE'){
+      let closed=false,layer='0';const pts=[];let x=null;
+      while(i<lines.length-1&&peekCode()!=='0'){
+        const[c,v]=nextPair();
+        if(c==='8')layer=v;
+        if(c==='70')closed=(parseInt(v)&1)===1;
+        if(c==='10')x=parseFloat(v);
+        if(c==='20'&&x!==null){pts.push({x,y:parseFloat(v)});x=null;}
+      }
+      if(pts.length>=2)entities.push({pts,closed,layer});
+
+    }else if(val==='LINE'){
+      let x1=0,y1=0,x2=0,y2=0,layer='0';
+      while(i<lines.length-1&&peekCode()!=='0'){
+        const[c,v]=nextPair();
+        if(c==='8')layer=v;
+        if(c==='10')x1=parseFloat(v);if(c==='20')y1=parseFloat(v);
+        if(c==='11')x2=parseFloat(v);if(c==='21')y2=parseFloat(v);
+      }
+      entities.push({pts:[{x:x1,y:y1},{x:x2,y:y2}],closed:false,layer});
+
+    }else if(val==='POLYLINE'){
+      let closed=false,layer='0';
+      while(i<lines.length-1&&peekCode()!=='0'){
+        const[c,v]=nextPair();
+        if(c==='8')layer=v;if(c==='70')closed=(parseInt(v)&1)===1;
+      }
+      const pts=[];
+      while(i<lines.length-1){
+        const[c,v]=nextPair();
+        if(c==='0'&&v==='SEQEND')break;
+        if(c==='0'&&v==='VERTEX'){
+          let vx=0,vy=0;
+          while(i<lines.length-1&&peekCode()!=='0'){
+            const[vc,vv]=nextPair();
+            if(vc==='10')vx=parseFloat(vv);if(vc==='20')vy=parseFloat(vv);
+          }
+          pts.push({x:vx,y:vy});
+        }
+      }
+      if(pts.length>=2)entities.push({pts,closed,layer});
+
+    }else if(val==='ARC'){
+      let cx=0,cy=0,r=1,a1=0,a2=360,layer='0';
+      while(i<lines.length-1&&peekCode()!=='0'){
+        const[c,v]=nextPair();
+        if(c==='8')layer=v;if(c==='10')cx=parseFloat(v);if(c==='20')cy=parseFloat(v);
+        if(c==='40')r=parseFloat(v);if(c==='50')a1=parseFloat(v);if(c==='51')a2=parseFloat(v);
+      }
+      const pts=[],span=(a2-a1+360)%360||360,segs=Math.max(8,Math.round(span/5));
+      for(let k=0;k<=segs;k++){const ang=(a1+span*k/segs)*Math.PI/180;pts.push({x:cx+r*Math.cos(ang),y:cy+r*Math.sin(ang)});}
+      entities.push({pts,closed:false,layer});
+
+    }else if(val==='CIRCLE'){
+      let cx=0,cy=0,r=1,layer='0';
+      while(i<lines.length-1&&peekCode()!=='0'){
+        const[c,v]=nextPair();
+        if(c==='8')layer=v;if(c==='10')cx=parseFloat(v);if(c==='20')cy=parseFloat(v);if(c==='40')r=parseFloat(v);
+      }
+      const pts=[];
+      for(let k=0;k<=64;k++){const ang=2*Math.PI*k/64;pts.push({x:cx+r*Math.cos(ang),y:cy+r*Math.sin(ang)});}
+      entities.push({pts,closed:true,layer});
+    }
+  }
+  return entities;
+}
+
+function parcelBounds(ents){
+  let xmin=Infinity,xmax=-Infinity,ymin=Infinity,ymax=-Infinity;
+  for(const e of ents)for(const p of e.pts){
+    if(p.x<xmin)xmin=p.x;if(p.x>xmax)xmax=p.x;
+    if(p.y<ymin)ymin=p.y;if(p.y>ymax)ymax=p.y;
+  }
+  return{xmin,xmax,ymin,ymax};
+}
+
+async function onDXFFile(file){
+  const status=document.getElementById('dxf-status');
+  const info=document.getElementById('dxf-info');
+  const desc=document.getElementById('dxf-desc');
+  status.className='dxf-status';status.style.display='block';
+  status.textContent='Leyendo DXF…';
+  try{
+    const text=await file.text();
+    const ents=parseDXFParcels(text);
+    if(!ents.length)throw new Error('No se encontraron entidades geométricas');
+    S.dxfParcels=ents;
+    const pb=parcelBounds(ents);
+    if(!S.bounds){
+      S.bounds={xmin:pb.xmin,xmax:pb.xmax,ymin:pb.ymin,ymax:pb.ymax};
+      setupView(S.bounds);
+      document.getElementById('placeholder').style.display='none';
+      document.getElementById('preview-canvas').style.display='block';
+    }
+    const nv=ents.reduce((s,e)=>s+e.pts.length,0);
+    const layers=[...new Set(ents.map(e=>e.layer))];
+    status.className='dxf-status ok';
+    status.textContent=`${ents.length} entidades · ${nv} vértices · ${layers.length} capa(s)`;
+    info.style.display='flex';desc.textContent=file.name;
+    document.getElementById('legend-parcel').style.display='flex';
+    if(confirm(
+      'DXF cargado: '+ents.length+' entidades.\n\n'+
+      '¿Usar el borde de la parcela como recorte automático?\n'+
+      '('+((pb.xmax-pb.xmin).toFixed(1))+' × '+((pb.ymax-pb.ymin).toFixed(1))+' m)'
+    )){
+      const mx=(pb.xmax-pb.xmin)*0.05,my=(pb.ymax-pb.ymin)*0.05;
+      let cx1=pb.xmin-mx, cx2=pb.xmax+mx, cy1=pb.ymin-my, cy2=pb.ymax+my;
+      // Si hay LAS cargado, verificar solapamiento y avisar si la parcela está fuera
+      if(S.header){
+        const b=S.header;
+        const overlapX = cx1<b.xmax && cx2>b.xmin;
+        const overlapY = cy1<b.ymax && cy2>b.ymin;
+        if(!overlapX || !overlapY){
+          alert('Aviso: la parcela no se solapa con el área del LAS.\n'+
+                'Se usa igualmente como recorte, pero puede que no haya puntos en esa zona.');
+        }
+        // Limitar a bounds del LAS con margen para evitar coordenadas extremas en canvas
+        // (no recortamos el crop, solo advertimos — el usuario puede querer el área de la parcela)
+      }
+      S.crop={x1:cx1,x2:cx2,y1:cy1,y2:cy2};
+      updateCropUI();
+    }
+    redraw();
+  }catch(e){
+    status.className='dxf-status err';
+    status.textContent='Error: '+e.message;
+    S.dxfParcels=[];
+  }
+}
+
+// LAS PARSER — SOLO CABECERA
+// ══════════════════════════════════════════════
+function parseHeader(buf){
+  const v=new DataView(buf);
+  const sig=String.fromCharCode(v.getUint8(0),v.getUint8(1),v.getUint8(2),v.getUint8(3));
+  if(sig!=='LASF')throw new Error('No es un archivo LAS válido');
+  const vMaj=v.getUint8(24),vMin=v.getUint8(25);
+  const ptFmt=v.getUint8(104),ptLen=v.getUint16(105,true),ptOff=v.getUint32(96,true);
+  const nPts=(vMaj===1&&vMin>=4)?v.getUint32(247,true):v.getUint32(107,true);
+  return{
+    version:`${vMaj}.${vMin}`,ptFmt,ptLen,ptOff,nPts,
+    xScale:v.getFloat64(131,true),yScale:v.getFloat64(139,true),zScale:v.getFloat64(147,true),
+    xOff:v.getFloat64(155,true),yOff:v.getFloat64(163,true),zOff:v.getFloat64(171,true),
+    xmax:v.getFloat64(179,true),xmin:v.getFloat64(187,true),
+    ymax:v.getFloat64(195,true),ymin:v.getFloat64(203,true),
+    zmax:v.getFloat64(211,true),zmin:v.getFloat64(219,true),
+    classOff:ptFmt<6?15:16,classMask:ptFmt<6?0x1F:0xFF,
+  };
+}
+
+// ══════════════════════════════════════════════
+// MUESTREO PREVIEW (streaming chunks)
+// ══════════════════════════════════════════════
+async function loadPreview(file,hdr,max=70000){
+  const{ptOff,ptLen,nPts,xScale,yScale,zScale,xOff,yOff,zOff,classOff,classMask}=hdr;
+  const step=Math.max(1,Math.ceil(nPts/max));
+  const CHUNK=4*1024*1024,pts=[],cc={};
+  let pi=0,read=0;
+  while(pi<nPts){
+    const ep=Math.min(pi+Math.ceil(CHUNK/ptLen),nPts);
+    const buf=await file.slice(ptOff+pi*ptLen,ptOff+ep*ptLen).arrayBuffer();
+    const dv=new DataView(buf),n=(ep-pi);
+    for(let i=0;i<n;i++){
+      const o=i*ptLen,c=dv.getUint8(o+classOff)&classMask;
+      cc[c]=(cc[c]||0)+1;
+      if((pi+i)%step===0){
+        pts.push({x:dv.getInt32(o,true)*xScale+xOff,
+                  y:dv.getInt32(o+4,true)*yScale+yOff,
+                  z:dv.getInt32(o+8,true)*zScale+zOff,c});
+      }
+    }
+    read+=n;pi=ep;
+    setProgress(read/nPts*100,`Leyendo ${fmtN(pi)}/${fmtN(nPts)} puntos…`);
+    await sl(0);
+  }
+  return{pts,classCounts:cc,step};
+}
+
+// ══════════════════════════════════════════════
+// CARGA FILTRADA PARA PROCESO
+// ══════════════════════════════════════════════
+async function loadFiltered(file,hdr,selCls,crop,poly=null){
+  const{ptOff,ptLen,nPts,xScale,yScale,zScale,xOff,yOff,zOff,classOff,classMask}=hdr;
+  const CHUNK=2*1024*1024;
+  const tx=[],ty=[],tz=[],ep=[],vp=[];
+  let pi=0,r=0;
+  while(pi<nPts){
+    const ep2=Math.min(pi+Math.ceil(CHUNK/ptLen),nPts);
+    const buf=await file.slice(ptOff+pi*ptLen,ptOff+ep2*ptLen).arrayBuffer();
+    const dv=new DataView(buf),n=(ep2-pi);
+    for(let i=0;i<n;i++){
+      const o=i*ptLen,c=dv.getUint8(o+classOff)&classMask;
+      if(!selCls.has(c))continue;
+      const x=dv.getInt32(o,true)*xScale+xOff,
+            y=dv.getInt32(o+4,true)*yScale+yOff,
+            z=dv.getInt32(o+8,true)*zScale+zOff;
+      if(crop&&(x<crop.x1||x>crop.x2||y<crop.y1||y>crop.y2))continue;
+      if(poly&&!pip(x,y,poly))continue;
+      const info=ci(c);
+      if(info.r==='t'){tx.push(x);ty.push(y);tz.push(z);}
+      else if(info.r==='e')ep.push({x,y,z});
+      else if(info.r==='v')vp.push({x,y,z});
+    }
+    r+=n;pi=ep2;
+    setProgress(r/nPts*45+5,`Filtrando ${fmtN(pi)}/${fmtN(nPts)}…`);
+    await sl(0);
+  }
+  return{topoX:tx,topoY:ty,topoZ:tz,edifPts:ep,vegPts:vp};
+}
+
+// ══════════════════════════════════════════════
+// GRID + SMOOTH
+// ══════════════════════════════════════════════
+
+// Seguro para arrays grandes — evita "Maximum call stack size exceeded"
+// que ocurre con Math.min(...array) cuando el array supera ~100K elementos
+function arrMin(a){let m=Infinity; for(let i=0;i<a.length;i++) if(a[i]<m) m=a[i]; return m;}
+function arrMax(a){let m=-Infinity;for(let i=0;i<a.length;i++) if(a[i]>m) m=a[i]; return m;}
+
+function buildGrid(tx,ty,tz,res){
+  if(tx.length<3)throw new Error('No hay suficientes puntos de suelo en el área');
+  const xmn=arrMin(tx),xmx=arrMax(tx),ymn=arrMin(ty),ymx=arrMax(ty);
+  const cols=Math.ceil((xmx-xmn)/res)+2,rows=Math.ceil((ymx-ymn)/res)+2;
+  const sumZ=new Float64Array(rows*cols),cnt=new Int32Array(rows*cols);
+  for(let i=0;i<tx.length;i++){
+    const c=Math.floor((tx[i]-xmn)/res),r=Math.floor((ty[i]-ymn)/res);
+    const idx=r*cols+c;sumZ[idx]+=tz[i];cnt[idx]++;
+  }
+  const grid=new Float64Array(rows*cols);
+  for(let i=0;i<rows*cols;i++)grid[i]=cnt[i]>0?sumZ[i]/cnt[i]:NaN;
+  return{grid,rows,cols,xmin:xmn,ymin:ymn,res};
+}
+function smoothGrid(g,passes){
+  const{grid,rows,cols}=g;
+  for(let p=0;p<passes;p++){
+    const t=new Float64Array(grid);
+    for(let r=1;r<rows-1;r++)for(let c=1;c<cols-1;c++){
+      const i=r*cols+c;if(!isNaN(grid[i]))continue;
+      let s=0,n=0;
+      for(const v of[grid[(r-1)*cols+c],grid[(r+1)*cols+c],grid[r*cols+c-1],grid[r*cols+c+1],
+                     grid[(r-1)*cols+c-1],grid[(r-1)*cols+c+1],grid[(r+1)*cols+c-1],grid[(r+1)*cols+c+1]])
+        if(!isNaN(v)){s+=v;n++;}
+      if(n>0)t[i]=s/n;
+    }
+    grid.set(t);
+  }
+}
+
+// ══════════════════════════════════════════════
+// MARCHING SQUARES
+// ══════════════════════════════════════════════
+function march(g,zlev){
+  const{grid,rows,cols,xmin,ymin,res}=g;
+  const gz=(r,c)=>(r<0||r>=rows||c<0||c>=cols)?NaN:grid[r*cols+c];
+  const ip=(z1,z2,x1,y1,x2,y2)=>{
+    if(isNaN(z1)||isNaN(z2))return null;
+    const t=(zlev-z1)/(z2-z1);return[x1+t*(x2-x1),y1+t*(y2-y1)];
+  };
+  const segs=[];
+  for(let r=0;r<rows-1;r++)for(let c=0;c<cols-1;c++){
+    const z00=gz(r,c),z10=gz(r+1,c),z01=gz(r,c+1),z11=gz(r+1,c+1);
+    if(isNaN(z00)||isNaN(z10)||isNaN(z01)||isNaN(z11))continue;
+    const x0=xmin+c*res,x1=xmin+(c+1)*res,y0=ymin+r*res,y1=ymin+(r+1)*res;
+    let idx=0;
+    if(z00>=zlev)idx|=1;if(z01>=zlev)idx|=2;if(z11>=zlev)idx|=4;if(z10>=zlev)idx|=8;
+    if(idx===0||idx===15)continue;
+    const B=ip(z00,z01,x0,y0,x1,y0),T=ip(z10,z11,x0,y1,x1,y1);
+    const L=ip(z00,z10,x0,y0,x0,y1),R=ip(z01,z11,x1,y0,x1,y1);
+    const push=(a,b)=>{if(a&&b)segs.push([a,b])};
+    if(idx===1||idx===14)push(B,L);else if(idx===2||idx===13)push(B,R);
+    else if(idx===3||idx===12)push(L,R);else if(idx===4||idx===11)push(R,T);
+    else if(idx===5){push(B,L);push(R,T);}else if(idx===6||idx===9)push(B,T);
+    else if(idx===7||idx===8)push(L,T);else if(idx===10){push(B,R);push(L,T);}
+  }
+  return segs;
+}
+function chain(segs,tol=1e-8){
+  const polys=[],rem=segs.slice();
+  const d2=(a,b)=>(a[0]-b[0])**2+(a[1]-b[1])**2;
+  while(rem.length){
+    let cur=[rem[0][0],rem[0][1]];rem.splice(0,1);let found=true;
+    while(found){found=false;
+      for(let i=0;i<rem.length;i++){
+        const[a,b]=rem[i],last=cur[cur.length-1],first=cur[0];
+        if(d2(a,last)<tol){cur.push(b);rem.splice(i,1);found=true;break;}
+        if(d2(b,last)<tol){cur.push(a);rem.splice(i,1);found=true;break;}
+        if(d2(a,first)<tol){cur.unshift(b);rem.splice(i,1);found=true;break;}
+        if(d2(b,first)<tol){cur.unshift(a);rem.splice(i,1);found=true;break;}
+      }
+    }
+    if(cur.length>=2)polys.push(cur);
+  }
+  return polys;
+}
+
+
+// Interpolación bilineal Z en el grid para un punto mundo
+function gridZ(gd, wx, wy){
+  if(!gd)return NaN;
+  const{grid,rows,cols,xmin,ymin,res}=gd;
+  const fc=(wx-xmin)/res, fr=(wy-ymin)/res;
+  const c0=Math.floor(fc), r0=Math.floor(fr);
+  const c1=c0+1, r1=r0+1;
+  if(c0<0||r0<0||c1>=cols||r1>=rows)return NaN;
+  const tx=fc-c0, ty=fr-r0;
+  const z00=grid[r0*cols+c0],z10=grid[r1*cols+c0];
+  const z01=grid[r0*cols+c1],z11=grid[r1*cols+c1];
+  if(isNaN(z00)||isNaN(z10)||isNaN(z01)||isNaN(z11))return NaN;
+  return z00*(1-tx)*(1-ty)+z01*tx*(1-ty)+z10*(1-tx)*ty+z11*tx*ty;
+}
+
+// Ray-casting point-in-polygon
+function pip(px, py, poly){
+  let inside=false;
+  for(let i=0,j=poly.length-1;i<poly.length;j=i++){
+    const xi=poly[i].x,yi=poly[i].y,xj=poly[j].x,yj=poly[j].y;
+    if((yi>py)!==(yj>py)&&px<(xj-xi)*(py-yi)/(yj-yi)+xi)inside=!inside;
+  }
+  return inside;
+}
+
+
+function tileUrl(src,z,x,y){
+  if(src==='osm')   return `https://tile.openstreetmap.org/${z}/${x}/${y}.png`;
+  if(src==='carto') return `https://a.basemaps.cartocdn.com/light_all/${z}/${x}/${y}.png`;
+  if(src==='pnoa')  return `https://www.ign.es/wmts/pnoa-ma?SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0&LAYER=OI.OrthoimageCoverage&STYLE=default&TILEMATRIXSET=GoogleMapsCompatible&TILEMATRIX=${z}&TILEROW=${y}&TILECOL=${x}&FORMAT=image/jpeg`;
+  if(src==='pnoa-topo') return `https://www.ign.es/wmts/mapa-raster?SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0&LAYER=MTN&STYLE=default&TILEMATRIXSET=GoogleMapsCompatible&TILEMATRIX=${z}&TILEROW=${y}&TILECOL=${x}&FORMAT=image/jpeg`;
+  return null;
+}
+
+// ══════════════════════════════════════════════
+// DXF R2010 — boilerplate generado con ezdxf (validado, 0 errores)
+// Solo la sección ENTITIES se genera dinámicamente.
+// ══════════════════════════════════════════════
+
+// Boilerplate estático de ezdxf (HEADER+CLASSES+TABLES+BLOCKS)
+const DXF_BOILERPLATE = `  0
+SECTION
+  2
+HEADER
+  9
+$ACADVER
+  1
+AC1024
+  9
+$ACADMAINTVER
+ 70
+6
+  9
+$DWGCODEPAGE
+  3
+UTF-8
+  9
+$LASTSAVEDBY
+  1
+ezdxf
+  9
+$INSBASE
+ 10
+0.0
+ 20
+0.0
+ 30
+0.0
+  9
+$EXTMIN
+ 10
+__EXTMINX__
+ 20
+__EXTMINY__
+ 30
+__EXTMINZ__
+  9
+$EXTMAX
+ 10
+__EXTMAXX__
+ 20
+__EXTMAXY__
+ 30
+__EXTMAXZ__
+  9
+$LIMMIN
+ 10
+__LIMMINX__
+ 20
+__LIMMINY__
+  9
+$LIMMAX
+ 10
+__LIMMAXX__
+ 20
+__LIMMAXY__
+  9
+$ORTHOMODE
+ 70
+0
+  9
+$REGENMODE
+ 70
+1
+  9
+$FILLMODE
+ 70
+1
+  9
+$QTEXTMODE
+ 70
+0
+  9
+$MIRRTEXT
+ 70
+1
+  9
+$LTSCALE
+ 40
+1.0
+  9
+$ATTMODE
+ 70
+1
+  9
+$TEXTSIZE
+ 40
+2.5
+  9
+$TRACEWID
+ 40
+1.0
+  9
+$TEXTSTYLE
+  7
+Standard
+  9
+$CLAYER
+  8
+0
+  9
+$CELTYPE
+  6
+ByLayer
+  9
+$CECOLOR
+ 62
+256
+  9
+$CELTSCALE
+ 40
+1.0
+  9
+$DISPSILH
+ 70
+0
+  9
+$DIMSCALE
+ 40
+1.0
+  9
+$DIMASZ
+ 40
+2.5
+  9
+$DIMEXO
+ 40
+0.625
+  9
+$DIMDLI
+ 40
+3.75
+  9
+$DIMRND
+ 40
+0.0
+  9
+$DIMDLE
+ 40
+0.0
+  9
+$DIMEXE
+ 40
+1.25
+  9
+$DIMTP
+ 40
+0.0
+  9
+$DIMTM
+ 40
+0.0
+  9
+$DIMTXT
+ 40
+2.5
+  9
+$DIMCEN
+ 40
+2.5
+  9
+$DIMTSZ
+ 40
+0.0
+  9
+$DIMTOL
+ 70
+0
+  9
+$DIMLIM
+ 70
+0
+  9
+$DIMTIH
+ 70
+0
+  9
+$DIMTOH
+ 70
+0
+  9
+$DIMSE1
+ 70
+0
+  9
+$DIMSE2
+ 70
+0
+  9
+$DIMTAD
+ 70
+1
+  9
+$DIMZIN
+ 70
+8
+  9
+$DIMBLK
+  1
+
+  9
+$DIMASO
+ 70
+1
+  9
+$DIMSHO
+ 70
+1
+  9
+$DIMPOST
+  1
+
+  9
+$DIMAPOST
+  1
+
+  9
+$DIMALT
+ 70
+0
+  9
+$DIMALTD
+ 70
+3
+  9
+$DIMALTF
+ 40
+0.03937007874
+  9
+$DIMLFAC
+ 40
+1.0
+  9
+$DIMTOFL
+ 70
+1
+  9
+$DIMTVP
+ 40
+0.0
+  9
+$DIMTIX
+ 70
+0
+  9
+$DIMSOXD
+ 70
+0
+  9
+$DIMSAH
+ 70
+0
+  9
+$DIMBLK1
+  1
+
+  9
+$DIMBLK2
+  1
+
+  9
+$DIMSTYLE
+  2
+ISO-25
+  9
+$DIMCLRD
+ 70
+0
+  9
+$DIMCLRE
+ 70
+0
+  9
+$DIMCLRT
+ 70
+0
+  9
+$DIMTFAC
+ 40
+1.0
+  9
+$DIMGAP
+ 40
+0.625
+  9
+$DIMJUST
+ 70
+0
+  9
+$DIMSD1
+ 70
+0
+  9
+$DIMSD2
+ 70
+0
+  9
+$DIMTOLJ
+ 70
+0
+  9
+$DIMTZIN
+ 70
+8
+  9
+$DIMALTZ
+ 70
+0
+  9
+$DIMALTTZ
+ 70
+0
+  9
+$DIMUPT
+ 70
+0
+  9
+$DIMDEC
+ 70
+2
+  9
+$DIMTDEC
+ 70
+2
+  9
+$DIMALTU
+ 70
+2
+  9
+$DIMALTTD
+ 70
+3
+  9
+$DIMTXSTY
+  7
+Standard
+  9
+$DIMAUNIT
+ 70
+0
+  9
+$DIMADEC
+ 70
+0
+  9
+$DIMALTRND
+ 40
+0.0
+  9
+$DIMAZIN
+ 70
+0
+  9
+$DIMDSEP
+ 70
+44
+  9
+$DIMATFIT
+ 70
+3
+  9
+$DIMFRAC
+ 70
+0
+  9
+$DIMLDRBLK
+  1
+
+  9
+$DIMLUNIT
+ 70
+2
+  9
+$DIMLWD
+ 70
+-2
+  9
+$DIMLWE
+ 70
+-2
+  9
+$DIMTMOVE
+ 70
+0
+  9
+$DIMFXL
+ 40
+1.0
+  9
+$DIMFXLON
+ 70
+0
+  9
+$DIMJOGANG
+ 40
+0.785398163397
+  9
+$DIMTFILL
+ 70
+0
+  9
+$DIMTFILLCLR
+ 70
+0
+  9
+$DIMARCSYM
+ 70
+0
+  9
+$DIMLTYPE
+  6
+
+  9
+$DIMLTEX1
+  6
+
+  9
+$DIMLTEX2
+  6
+
+  9
+$DIMTXTDIRECTION
+ 70
+0
+  9
+$LUNITS
+ 70
+2
+  9
+$LUPREC
+ 70
+4
+  9
+$SKETCHINC
+ 40
+1.0
+  9
+$FILLETRAD
+ 40
+10.0
+  9
+$AUNITS
+ 70
+0
+  9
+$AUPREC
+ 70
+2
+  9
+$MENU
+  1
+.
+  9
+$ELEVATION
+ 40
+0.0
+  9
+$PELEVATION
+ 40
+0.0
+  9
+$THICKNESS
+ 40
+0.0
+  9
+$LIMCHECK
+ 70
+0
+  9
+$CHAMFERA
+ 40
+0.0
+  9
+$CHAMFERB
+ 40
+0.0
+  9
+$CHAMFERC
+ 40
+0.0
+  9
+$CHAMFERD
+ 40
+0.0
+  9
+$SKPOLY
+ 70
+0
+  9
+$TDCREATE
+ 40
+2461148.387037037
+  9
+$TDUCREATE
+ 40
+2458532.153996898
+  9
+$TDUPDATE
+ 40
+2461148.387037037
+  9
+$TDUUPDATE
+ 40
+2458532.1544311
+  9
+$TDINDWG
+ 40
+0.0
+  9
+$TDUSRTIMER
+ 40
+0.0
+  9
+$USRTIMER
+ 70
+1
+  9
+$ANGBASE
+ 50
+0.0
+  9
+$ANGDIR
+ 70
+0
+  9
+$PDMODE
+ 70
+0
+  9
+$PDSIZE
+ 40
+0.0
+  9
+$PLINEWID
+ 40
+0.0
+  9
+$SPLFRAME
+ 70
+0
+  9
+$SPLINETYPE
+ 70
+6
+  9
+$SPLINESEGS
+ 70
+8
+  9
+$HANDSEED
+  5
+38
+  9
+$SURFTAB1
+ 70
+6
+  9
+$SURFTAB2
+ 70
+6
+  9
+$SURFTYPE
+ 70
+6
+  9
+$SURFU
+ 70
+6
+  9
+$SURFV
+ 70
+6
+  9
+$UCSBASE
+  2
+
+  9
+$UCSNAME
+  2
+
+  9
+$UCSORG
+ 10
+0.0
+ 20
+0.0
+ 30
+0.0
+  9
+$UCSXDIR
+ 10
+1.0
+ 20
+0.0
+ 30
+0.0
+  9
+$UCSYDIR
+ 10
+0.0
+ 20
+1.0
+ 30
+0.0
+  9
+$UCSORTHOREF
+  2
+
+  9
+$UCSORTHOVIEW
+ 70
+0
+  9
+$UCSORGTOP
+ 10
+0.0
+ 20
+0.0
+ 30
+0.0
+  9
+$UCSORGBOTTOM
+ 10
+0.0
+ 20
+0.0
+ 30
+0.0
+  9
+$UCSORGLEFT
+ 10
+0.0
+ 20
+0.0
+ 30
+0.0
+  9
+$UCSORGRIGHT
+ 10
+0.0
+ 20
+0.0
+ 30
+0.0
+  9
+$UCSORGFRONT
+ 10
+0.0
+ 20
+0.0
+ 30
+0.0
+  9
+$UCSORGBACK
+ 10
+0.0
+ 20
+0.0
+ 30
+0.0
+  9
+$PUCSBASE
+  2
+
+  9
+$PUCSNAME
+  2
+
+  9
+$PUCSORG
+ 10
+0.0
+ 20
+0.0
+ 30
+0.0
+  9
+$PUCSXDIR
+ 10
+1.0
+ 20
+0.0
+ 30
+0.0
+  9
+$PUCSYDIR
+ 10
+0.0
+ 20
+1.0
+ 30
+0.0
+  9
+$PUCSORTHOREF
+  2
+
+  9
+$PUCSORTHOVIEW
+ 70
+0
+  9
+$PUCSORGTOP
+ 10
+0.0
+ 20
+0.0
+ 30
+0.0
+  9
+$PUCSORGBOTTOM
+ 10
+0.0
+ 20
+0.0
+ 30
+0.0
+  9
+$PUCSORGLEFT
+ 10
+0.0
+ 20
+0.0
+ 30
+0.0
+  9
+$PUCSORGRIGHT
+ 10
+0.0
+ 20
+0.0
+ 30
+0.0
+  9
+$PUCSORGFRONT
+ 10
+0.0
+ 20
+0.0
+ 30
+0.0
+  9
+$PUCSORGBACK
+ 10
+0.0
+ 20
+0.0
+ 30
+0.0
+  9
+$USERI1
+ 70
+0
+  9
+$USERI2
+ 70
+0
+  9
+$USERI3
+ 70
+0
+  9
+$USERI4
+ 70
+0
+  9
+$USERI5
+ 70
+0
+  9
+$USERR1
+ 40
+0.0
+  9
+$USERR2
+ 40
+0.0
+  9
+$USERR3
+ 40
+0.0
+  9
+$USERR4
+ 40
+0.0
+  9
+$USERR5
+ 40
+0.0
+  9
+$WORLDVIEW
+ 70
+1
+  9
+$SHADEDGE
+ 70
+3
+  9
+$SHADEDIF
+ 70
+70
+  9
+$TILEMODE
+ 70
+1
+  9
+$MAXACTVP
+ 70
+64
+  9
+$PINSBASE
+ 10
+0.0
+ 20
+0.0
+ 30
+0.0
+  9
+$PLIMCHECK
+ 70
+0
+  9
+$PEXTMIN
+ 10
+1e+20
+ 20
+1e+20
+ 30
+1e+20
+  9
+$PEXTMAX
+ 10
+-1e+20
+ 20
+-1e+20
+ 30
+-1e+20
+  9
+$PLIMMIN
+ 10
+0.0
+ 20
+0.0
+  9
+$PLIMMAX
+ 10
+420.0
+ 20
+297.0
+  9
+$UNITMODE
+ 70
+0
+  9
+$VISRETAIN
+ 70
+1
+  9
+$PLINEGEN
+ 70
+0
+  9
+$PSLTSCALE
+ 70
+1
+  9
+$TREEDEPTH
+ 70
+3020
+  9
+$CMLSTYLE
+  2
+Standard
+  9
+$CMLJUST
+ 70
+0
+  9
+$CMLSCALE
+ 40
+20.0
+  9
+$PROXYGRAPHICS
+ 70
+1
+  9
+$MEASUREMENT
+ 70
+1
+  9
+$CELWEIGHT
+370
+-1
+  9
+$ENDCAPS
+280
+0
+  9
+$JOINSTYLE
+280
+0
+  9
+$LWDISPLAY
+290
+0
+  9
+$INSUNITS
+ 70
+6
+  9
+$HYPERLINKBASE
+  1
+
+  9
+$STYLESHEET
+  1
+
+  9
+$XEDIT
+290
+1
+  9
+$CEPSNTYPE
+380
+0
+  9
+$PSTYLEMODE
+290
+1
+  9
+$FINGERPRINTGUID
+  2
+{DEB5F852-211E-40D8-874A-37722F5D9D7A}
+  9
+$VERSIONGUID
+  2
+{C09965EE-E9B9-4D28-83EB-F9EBE3ABBBFF}
+  9
+$EXTNAMES
+290
+1
+  9
+$PSVPSCALE
+ 40
+0.0
+  9
+$OLESTARTUP
+290
+0
+  9
+$SORTENTS
+280
+127
+  9
+$INDEXCTL
+280
+0
+  9
+$HIDETEXT
+280
+1
+  9
+$XCLIPFRAME
+280
+1
+  9
+$HALOGAP
+280
+0
+  9
+$OBSCOLOR
+ 70
+257
+  9
+$OBSLTYPE
+280
+0
+  9
+$INTERSECTIONDISPLAY
+280
+0
+  9
+$INTERSECTIONCOLOR
+ 70
+257
+  9
+$DIMASSOC
+280
+2
+  9
+$PROJECTNAME
+  1
+
+  9
+$CAMERADISPLAY
+290
+0
+  9
+$LENSLENGTH
+ 40
+50.0
+  9
+$CAMERAHEIGHT
+ 40
+0.0
+  9
+$STEPSPERSEC
+ 40
+24.0
+  9
+$STEPSIZE
+ 40
+100.0
+  9
+$3DDWFPREC
+ 40
+2.0
+  9
+$PSOLWIDTH
+ 40
+0.005
+  9
+$PSOLHEIGHT
+ 40
+0.08
+  9
+$LOFTANG1
+ 40
+1.570796326795
+  9
+$LOFTANG2
+ 40
+1.570796326795
+  9
+$LOFTMAG1
+ 40
+0.0
+  9
+$LOFTMAG2
+ 40
+0.0
+  9
+$LOFTPARAM
+ 70
+7
+  9
+$LOFTNORMALS
+280
+1
+  9
+$LATITUDE
+ 40
+37.795
+  9
+$LONGITUDE
+ 40
+-122.394
+  9
+$NORTHDIRECTION
+ 40
+0.0
+  9
+$TIMEZONE
+ 70
+-8000
+  9
+$LIGHTGLYPHDISPLAY
+280
+1
+  9
+$TILEMODELIGHTSYNCH
+280
+1
+  9
+$CMATERIAL
+347
+20
+  9
+$SOLIDHIST
+280
+0
+  9
+$SHOWHIST
+280
+1
+  9
+$DWFFRAME
+280
+2
+  9
+$DGNFRAME
+280
+2
+  9
+$REALWORLDSCALE
+290
+1
+  9
+$INTERFERECOLOR
+ 62
+256
+  9
+$CSHADOW
+280
+0
+  9
+$SHADOWPLANELOCATION
+ 40
+0.0
+  0
+ENDSEC
+  0
+SECTION
+  2
+CLASSES
+  0
+CLASS
+  1
+ACDBDICTIONARYWDFLT
+  2
+AcDbDictionaryWithDefault
+  3
+ObjectDBX Classes
+ 90
+0
+ 91
+0
+280
+0
+281
+0
+  0
+CLASS
+  1
+SUN
+  2
+AcDbSun
+  3
+SCENEOE
+ 90
+1153
+ 91
+0
+280
+0
+281
+0
+  0
+CLASS
+  1
+VISUALSTYLE
+  2
+AcDbVisualStyle
+  3
+ObjectDBX Classes
+ 90
+4095
+ 91
+0
+280
+0
+281
+0
+  0
+CLASS
+  1
+MATERIAL
+  2
+AcDbMaterial
+  3
+ObjectDBX Classes
+ 90
+1153
+ 91
+0
+280
+0
+281
+0
+  0
+CLASS
+  1
+SCALE
+  2
+AcDbScale
+  3
+ObjectDBX Classes
+ 90
+1153
+ 91
+0
+280
+0
+281
+0
+  0
+CLASS
+  1
+TABLESTYLE
+  2
+AcDbTableStyle
+  3
+ObjectDBX Classes
+ 90
+4095
+ 91
+0
+280
+0
+281
+0
+  0
+CLASS
+  1
+MLEADERSTYLE
+  2
+AcDbMLeaderStyle
+  3
+ACDB_MLEADERSTYLE_CLASS
+ 90
+4095
+ 91
+0
+280
+0
+281
+0
+  0
+CLASS
+  1
+DICTIONARYVAR
+  2
+AcDbDictionaryVar
+  3
+ObjectDBX Classes
+ 90
+0
+ 91
+0
+280
+0
+281
+0
+  0
+CLASS
+  1
+CELLSTYLEMAP
+  2
+AcDbCellStyleMap
+  3
+ObjectDBX Classes
+ 90
+1152
+ 91
+0
+280
+0
+281
+0
+  0
+CLASS
+  1
+MENTALRAYRENDERSETTINGS
+  2
+AcDbMentalRayRenderSettings
+  3
+SCENEOE
+ 90
+1024
+ 91
+0
+280
+0
+281
+0
+  0
+CLASS
+  1
+ACDBDETAILVIEWSTYLE
+  2
+AcDbDetailViewStyle
+  3
+ObjectDBX Classes
+ 90
+1025
+ 91
+0
+280
+0
+281
+0
+  0
+CLASS
+  1
+ACDBSECTIONVIEWSTYLE
+  2
+AcDbSectionViewStyle
+  3
+ObjectDBX Classes
+ 90
+1025
+ 91
+0
+280
+0
+281
+0
+  0
+CLASS
+  1
+RASTERVARIABLES
+  2
+AcDbRasterVariables
+  3
+ISM
+ 90
+0
+ 91
+0
+280
+0
+281
+0
+  0
+CLASS
+  1
+LAYOUT
+  2
+AcDbLayout
+  3
+ObjectDBX Classes
+ 90
+0
+ 91
+0
+280
+0
+281
+0
+  0
+CLASS
+  1
+ACDBPLACEHOLDER
+  2
+AcDbPlaceHolder
+  3
+ObjectDBX Classes
+ 90
+0
+ 91
+0
+280
+0
+281
+0
+  0
+ENDSEC
+  0
+SECTION
+  2
+TABLES
+  0
+TABLE
+  2
+VPORT
+  5
+8
+330
+0
+100
+AcDbSymbolTable
+ 70
+1
+  0
+VPORT
+  5
+23
+330
+8
+100
+AcDbSymbolTableRecord
+100
+AcDbViewportTableRecord
+  2
+*Active
+ 70
+0
+ 10
+0.0
+ 20
+0.0
+ 11
+1.0
+ 21
+1.0
+ 12
+0.0
+ 22
+0.0
+ 13
+0.0
+ 23
+0.0
+ 14
+0.5
+ 24
+0.5
+ 15
+0.5
+ 25
+0.5
+ 16
+0.0
+ 26
+0.0
+ 36
+1.0
+ 17
+0.0
+ 27
+0.0
+ 37
+0.0
+ 40
+1000.0
+ 41
+1.34
+ 42
+50.0
+ 43
+0.0
+ 44
+0.0
+ 50
+0.0
+ 51
+0.0
+ 71
+0
+ 72
+1000
+ 73
+1
+ 74
+3
+ 75
+0
+ 76
+0
+ 77
+0
+ 78
+0
+281
+0
+ 65
+0
+146
+0.0
+  0
+ENDTAB
+  0
+TABLE
+  2
+LTYPE
+  5
+2
+330
+0
+100
+AcDbSymbolTable
+ 70
+3
+  0
+LTYPE
+  5
+24
+330
+2
+100
+AcDbSymbolTableRecord
+100
+AcDbLinetypeTableRecord
+  2
+ByBlock
+ 70
+0
+  3
+
+ 72
+65
+ 73
+0
+ 40
+0.0
+  0
+LTYPE
+  5
+25
+330
+2
+100
+AcDbSymbolTableRecord
+100
+AcDbLinetypeTableRecord
+  2
+ByLayer
+ 70
+0
+  3
+
+ 72
+65
+ 73
+0
+ 40
+0.0
+  0
+LTYPE
+  5
+26
+330
+2
+100
+AcDbSymbolTableRecord
+100
+AcDbLinetypeTableRecord
+  2
+Continuous
+ 70
+0
+  3
+
+ 72
+65
+ 73
+0
+ 40
+0.0
+  0
+ENDTAB
+  0
+TABLE
+  2
+LAYER
+  5
+1
+330
+0
+100
+AcDbSymbolTable
+ 70
+8
+  0
+LAYER
+  5
+27
+330
+1
+100
+AcDbSymbolTableRecord
+100
+AcDbLayerTableRecord
+  2
+0
+ 70
+0
+ 62
+7
+  6
+Continuous
+370
+-3
+390
+13
+347
+21
+  0
+LAYER
+  5
+28
+330
+1
+100
+AcDbSymbolTableRecord
+100
+AcDbLayerTableRecord
+  2
+Defpoints
+ 70
+0
+ 62
+7
+  6
+Continuous
+290
+0
+370
+-3
+390
+13
+347
+21
+  0
+LAYER
+  5
+2F
+330
+1
+100
+AcDbSymbolTableRecord
+100
+AcDbLayerTableRecord
+  2
+CURVAS-NORMALES
+ 70
+0
+ 62
+3
+  6
+Continuous
+370
+-3
+390
+13
+347
+21
+  0
+LAYER
+  5
+30
+330
+1
+100
+AcDbSymbolTableRecord
+100
+AcDbLayerTableRecord
+  2
+CURVAS-MAESTRAS
+ 70
+0
+ 62
+2
+  6
+Continuous
+370
+-3
+390
+13
+347
+21
+  0
+LAYER
+  5
+31
+330
+1
+100
+AcDbSymbolTableRecord
+100
+AcDbLayerTableRecord
+  2
+COTAS-TEXTO
+ 70
+0
+ 62
+7
+  6
+Continuous
+370
+-3
+390
+13
+347
+21
+  0
+LAYER
+  5
+32
+330
+1
+100
+AcDbSymbolTableRecord
+100
+AcDbLayerTableRecord
+  2
+EDIFICACION
+ 70
+0
+ 62
+1
+  6
+Continuous
+370
+-3
+390
+13
+347
+21
+  0
+LAYER
+  5
+33
+330
+1
+100
+AcDbSymbolTableRecord
+100
+AcDbLayerTableRecord
+  2
+VEGETACION
+ 70
+0
+ 62
+5
+  6
+Continuous
+370
+-3
+390
+13
+347
+21
+  0
+LAYER
+  5
+34
+330
+1
+100
+AcDbSymbolTableRecord
+100
+AcDbLayerTableRecord
+  2
+PARCELAS-CATASTRO
+ 70
+0
+ 62
+30
+  6
+Continuous
+370
+-3
+390
+13
+347
+21
+  0
+ENDTAB
+  0
+TABLE
+  2
+STYLE
+  5
+5
+330
+0
+100
+AcDbSymbolTable
+ 70
+1
+  0
+STYLE
+  5
+29
+330
+5
+100
+AcDbSymbolTableRecord
+100
+AcDbTextStyleTableRecord
+  2
+Standard
+ 70
+0
+ 40
+0.0
+ 41
+1.0
+ 50
+0.0
+ 71
+0
+ 42
+2.5
+  3
+txt
+  4
+
+  0
+ENDTAB
+  0
+TABLE
+  2
+VIEW
+  5
+7
+330
+0
+100
+AcDbSymbolTable
+ 70
+0
+  0
+ENDTAB
+  0
+TABLE
+  2
+UCS
+  5
+6
+330
+0
+100
+AcDbSymbolTable
+ 70
+0
+  0
+ENDTAB
+  0
+TABLE
+  2
+APPID
+  5
+3
+330
+0
+100
+AcDbSymbolTable
+ 70
+3
+  0
+APPID
+  5
+2A
+330
+3
+100
+AcDbSymbolTableRecord
+100
+AcDbRegAppTableRecord
+  2
+ACAD
+ 70
+0
+  0
+APPID
+  5
+35
+330
+3
+100
+AcDbSymbolTableRecord
+100
+AcDbRegAppTableRecord
+  2
+HATCHBACKGROUNDCOLOR
+ 70
+0
+  0
+APPID
+  5
+36
+330
+3
+100
+AcDbSymbolTableRecord
+100
+AcDbRegAppTableRecord
+  2
+EZDXF
+ 70
+0
+  0
+ENDTAB
+  0
+TABLE
+  2
+DIMSTYLE
+  5
+4
+330
+0
+100
+AcDbSymbolTable
+ 70
+1
+100
+AcDbDimStyleTable
+  0
+DIMSTYLE
+105
+2B
+330
+4
+100
+AcDbSymbolTableRecord
+100
+AcDbDimStyleTableRecord
+  2
+Standard
+ 70
+0
+ 40
+1.0
+ 41
+2.5
+ 42
+0.625
+ 43
+3.75
+ 44
+1.25
+ 45
+0.0
+ 46
+0.0
+ 47
+0.0
+ 48
+0.0
+ 49
+2.5
+140
+2.5
+141
+2.5
+142
+0.0
+143
+0.03937007874
+144
+1.0
+145
+0.0
+146
+1.0
+147
+0.625
+148
+0.0
+ 69
+0
+ 70
+0
+ 71
+0
+ 72
+0
+ 73
+0
+ 74
+0
+ 75
+0
+ 76
+0
+ 77
+1
+ 78
+8
+ 79
+3
+170
+0
+171
+3
+172
+1
+173
+0
+174
+0
+175
+0
+176
+0
+177
+0
+178
+0
+179
+2
+271
+2
+272
+2
+273
+2
+274
+3
+275
+0
+276
+0
+277
+2
+278
+44
+279
+0
+280
+0
+281
+0
+282
+0
+283
+0
+284
+8
+285
+0
+286
+0
+288
+0
+289
+3
+290
+0
+371
+-2
+372
+-2
+  0
+ENDTAB
+  0
+TABLE
+  2
+BLOCK_RECORD
+  5
+9
+330
+0
+100
+AcDbSymbolTable
+ 70
+2
+  0
+BLOCK_RECORD
+  5
+17
+330
+9
+100
+AcDbSymbolTableRecord
+100
+AcDbBlockTableRecord
+  2
+*Model_Space
+340
+1A
+ 70
+0
+280
+1
+281
+0
+  0
+BLOCK_RECORD
+  5
+1B
+330
+9
+100
+AcDbSymbolTableRecord
+100
+AcDbBlockTableRecord
+  2
+*Paper_Space
+340
+1E
+ 70
+0
+280
+1
+281
+0
+  0
+ENDTAB
+  0
+ENDSEC
+  0
+SECTION
+  2
+BLOCKS
+  0
+BLOCK
+  5
+18
+330
+17
+100
+AcDbEntity
+  8
+0
+100
+AcDbBlockBegin
+  2
+*Model_Space
+ 70
+0
+ 10
+0.0
+ 20
+0.0
+ 30
+0.0
+  3
+*Model_Space
+  1
+
+  0
+ENDBLK
+  5
+19
+330
+17
+100
+AcDbEntity
+  8
+0
+100
+AcDbBlockEnd
+  0
+BLOCK
+  5
+1C
+330
+1B
+100
+AcDbEntity
+  8
+0
+100
+AcDbBlockBegin
+  2
+*Paper_Space
+ 70
+0
+ 10
+0.0
+ 20
+0.0
+ 30
+0.0
+  3
+*Paper_Space
+  1
+
+  0
+ENDBLK
+  5
+1D
+330
+1B
+100
+AcDbEntity
+  8
+0
+100
+AcDbBlockEnd
+  0
+ENDSEC`;
+
+// Sección OBJECTS + EOF (estática)
+const DXF_OBJECTS = `  0
+SECTION
+  2
+OBJECTS
+  0
+DICTIONARY
+  5
+A
+330
+0
+100
+AcDbDictionary
+281
+1
+  3
+ACAD_COLOR
+350
+B
+  3
+ACAD_GROUP
+350
+C
+  3
+ACAD_LAYOUT
+350
+D
+  3
+ACAD_MATERIAL
+350
+E
+  3
+ACAD_MLEADERSTYLE
+350
+F
+  3
+ACAD_MLINESTYLE
+350
+10
+  3
+ACAD_PLOTSETTINGS
+350
+11
+  3
+ACAD_PLOTSTYLENAME
+350
+12
+  3
+ACAD_SCALELIST
+350
+14
+  3
+ACAD_TABLESTYLE
+350
+15
+  3
+ACAD_VISUALSTYLE
+350
+16
+  3
+EZDXF_META
+350
+2D
+  0
+DICTIONARY
+  5
+B
+330
+A
+100
+AcDbDictionary
+281
+1
+  0
+DICTIONARY
+  5
+C
+330
+A
+100
+AcDbDictionary
+281
+1
+  0
+DICTIONARY
+  5
+D
+330
+A
+100
+AcDbDictionary
+281
+1
+  3
+Model
+350
+1A
+  3
+Layout1
+350
+1E
+  0
+DICTIONARY
+  5
+E
+330
+A
+100
+AcDbDictionary
+281
+1
+  3
+ByBlock
+350
+1F
+  3
+ByLayer
+350
+20
+  3
+Global
+350
+21
+  0
+DICTIONARY
+  5
+F
+330
+A
+100
+AcDbDictionary
+281
+1
+  3
+Standard
+350
+2C
+  0
+DICTIONARY
+  5
+10
+330
+A
+100
+AcDbDictionary
+281
+1
+  3
+Standard
+350
+22
+  0
+DICTIONARY
+  5
+11
+330
+A
+100
+AcDbDictionary
+281
+1
+  0
+ACDBDICTIONARYWDFLT
+  5
+12
+330
+A
+100
+AcDbDictionary
+281
+1
+  3
+Normal
+350
+13
+100
+AcDbDictionaryWithDefault
+340
+13
+  0
+ACDBPLACEHOLDER
+  5
+13
+330
+12
+  0
+DICTIONARY
+  5
+14
+330
+A
+100
+AcDbDictionary
+281
+1
+  0
+DICTIONARY
+  5
+15
+330
+A
+100
+AcDbDictionary
+281
+1
+  0
+DICTIONARY
+  5
+16
+330
+A
+100
+AcDbDictionary
+281
+1
+  0
+LAYOUT
+  5
+1A
+330
+D
+100
+AcDbPlotSettings
+  1
+
+  4
+A3
+  6
+
+ 40
+7.5
+ 41
+20.0
+ 42
+7.5
+ 43
+20.0
+ 44
+420.0
+ 45
+297.0
+ 46
+0.0
+ 47
+0.0
+ 48
+0.0
+ 49
+0.0
+140
+0.0
+141
+0.0
+142
+1.0
+143
+1.0
+ 70
+1024
+ 72
+1
+ 73
+0
+ 74
+5
+  7
+
+ 75
+16
+ 76
+0
+ 77
+2
+ 78
+300
+147
+1.0
+148
+0.0
+149
+0.0
+100
+AcDbLayout
+  1
+Model
+ 70
+1
+ 71
+0
+ 10
+0.0
+ 20
+0.0
+ 11
+420.0
+ 21
+297.0
+ 12
+0.0
+ 22
+0.0
+ 32
+0.0
+ 14
+1e+20
+ 24
+1e+20
+ 34
+1e+20
+ 15
+-1e+20
+ 25
+-1e+20
+ 35
+-1e+20
+146
+0.0
+ 13
+0.0
+ 23
+0.0
+ 33
+0.0
+ 16
+1.0
+ 26
+0.0
+ 36
+0.0
+ 17
+0.0
+ 27
+1.0
+ 37
+0.0
+ 76
+1
+330
+17
+  0
+LAYOUT
+  5
+1E
+330
+D
+100
+AcDbPlotSettings
+  1
+
+  4
+A3
+  6
+
+ 40
+7.5
+ 41
+20.0
+ 42
+7.5
+ 43
+20.0
+ 44
+420.0
+ 45
+297.0
+ 46
+0.0
+ 47
+0.0
+ 48
+0.0
+ 49
+0.0
+140
+0.0
+141
+0.0
+142
+1.0
+143
+1.0
+ 70
+0
+ 72
+1
+ 73
+0
+ 74
+5
+  7
+
+ 75
+16
+ 76
+0
+ 77
+2
+ 78
+300
+147
+1.0
+148
+0.0
+149
+0.0
+100
+AcDbLayout
+  1
+Layout1
+ 70
+1
+ 71
+1
+ 10
+0.0
+ 20
+0.0
+ 11
+420.0
+ 21
+297.0
+ 12
+0.0
+ 22
+0.0
+ 32
+0.0
+ 14
+1e+20
+ 24
+1e+20
+ 34
+1e+20
+ 15
+-1e+20
+ 25
+-1e+20
+ 35
+-1e+20
+146
+0.0
+ 13
+0.0
+ 23
+0.0
+ 33
+0.0
+ 16
+1.0
+ 26
+0.0
+ 36
+0.0
+ 17
+0.0
+ 27
+1.0
+ 37
+0.0
+ 76
+1
+330
+1B
+  0
+MATERIAL
+  5
+1F
+102
+{ACAD_REACTORS
+330
+E
+102
+}
+330
+E
+100
+AcDbMaterial
+  1
+ByBlock
+  2
+
+ 70
+0
+ 40
+1.0
+ 71
+1
+ 41
+1.0
+ 91
+-1023410177
+ 42
+1.0
+ 72
+1
+  3
+
+ 73
+1
+ 74
+1
+ 75
+1
+ 44
+0.5
+ 73
+0
+ 45
+1.0
+ 46
+1.0
+ 77
+1
+  4
+
+ 78
+1
+ 79
+1
+170
+1
+ 48
+1.0
+171
+1
+  6
+
+172
+1
+173
+1
+174
+1
+140
+1.0
+141
+1.0
+175
+1
+  7
+
+176
+1
+177
+1
+178
+1
+143
+1.0
+179
+1
+  8
+
+270
+1
+271
+1
+272
+1
+145
+1.0
+146
+1.0
+273
+1
+  9
+
+274
+1
+275
+1
+276
+1
+ 42
+1.0
+ 72
+1
+  3
+
+ 73
+1
+ 74
+1
+ 75
+1
+ 94
+63
+  0
+MATERIAL
+  5
+20
+102
+{ACAD_REACTORS
+330
+E
+102
+}
+330
+E
+100
+AcDbMaterial
+  1
+ByLayer
+  2
+
+ 70
+0
+ 40
+1.0
+ 71
+1
+ 41
+1.0
+ 91
+-1023410177
+ 42
+1.0
+ 72
+1
+  3
+
+ 73
+1
+ 74
+1
+ 75
+1
+ 44
+0.5
+ 73
+0
+ 45
+1.0
+ 46
+1.0
+ 77
+1
+  4
+
+ 78
+1
+ 79
+1
+170
+1
+ 48
+1.0
+171
+1
+  6
+
+172
+1
+173
+1
+174
+1
+140
+1.0
+141
+1.0
+175
+1
+  7
+
+176
+1
+177
+1
+178
+1
+143
+1.0
+179
+1
+  8
+
+270
+1
+271
+1
+272
+1
+145
+1.0
+146
+1.0
+273
+1
+  9
+
+274
+1
+275
+1
+276
+1
+ 42
+1.0
+ 72
+1
+  3
+
+ 73
+1
+ 74
+1
+ 75
+1
+ 94
+63
+  0
+MATERIAL
+  5
+21
+102
+{ACAD_REACTORS
+330
+E
+102
+}
+330
+E
+100
+AcDbMaterial
+  1
+Global
+  2
+
+ 70
+0
+ 40
+1.0
+ 71
+1
+ 41
+1.0
+ 91
+-1023410177
+ 42
+1.0
+ 72
+1
+  3
+
+ 73
+1
+ 74
+1
+ 75
+1
+ 44
+0.5
+ 73
+0
+ 45
+1.0
+ 46
+1.0
+ 77
+1
+  4
+
+ 78
+1
+ 79
+1
+170
+1
+ 48
+1.0
+171
+1
+  6
+
+172
+1
+173
+1
+174
+1
+140
+1.0
+141
+1.0
+175
+1
+  7
+
+176
+1
+177
+1
+178
+1
+143
+1.0
+179
+1
+  8
+
+270
+1
+271
+1
+272
+1
+145
+1.0
+146
+1.0
+273
+1
+  9
+
+274
+1
+275
+1
+276
+1
+ 42
+1.0
+ 72
+1
+  3
+
+ 73
+1
+ 74
+1
+ 75
+1
+ 94
+63
+  0
+MLINESTYLE
+  5
+22
+102
+{ACAD_REACTORS
+330
+10
+102
+}
+330
+10
+100
+AcDbMlineStyle
+  2
+Standard
+ 70
+0
+  3
+
+ 62
+256
+ 51
+90.0
+ 52
+90.0
+ 71
+2
+ 49
+0.5
+ 62
+256
+  6
+BYLAYER
+ 49
+-0.5
+ 62
+256
+  6
+BYLAYER
+  0
+MLEADERSTYLE
+  5
+2C
+102
+{ACAD_REACTORS
+330
+F
+102
+}
+330
+F
+100
+AcDbMLeaderStyle
+179
+2
+170
+2
+171
+1
+172
+0
+ 90
+2
+ 40
+0.0
+ 41
+0.0
+173
+1
+ 91
+-1056964608
+ 92
+-2
+290
+1
+ 42
+2.0
+291
+1
+ 43
+8.0
+  3
+Standard
+ 44
+4.0
+300
+
+342
+29
+174
+1
+175
+1
+176
+0
+178
+1
+ 93
+-1056964608
+ 45
+4.0
+292
+0
+297
+0
+ 46
+4.0
+ 94
+-1056964608
+ 47
+1.0
+ 49
+1.0
+140
+1.0
+294
+1
+141
+0.0
+177
+0
+142
+1.0
+295
+0
+296
+0
+143
+3.75
+271
+0
+272
+9
+273
+9
+  0
+DICTIONARY
+  5
+2D
+330
+A
+100
+AcDbDictionary
+280
+1
+281
+1
+  3
+CREATED_BY_EZDXF
+350
+2E
+  3
+WRITTEN_BY_EZDXF
+350
+37
+  0
+DICTIONARYVAR
+  5
+2E
+330
+2D
+100
+DictionaryVariables
+280
+0
+  1
+1.4.3 @ 2026-04-17T09:17:20.761065+00:00
+  0
+DICTIONARYVAR
+  5
+37
+330
+2D
+100
+DictionaryVariables
+280
+0
+  1
+1.4.3 @ 2026-04-17T09:17:20.761946+00:00
+  0
+ENDSEC
+  0
+EOF
+`;
+
+// Handle Model_Space (extraído del boilerplate)
+// Handle de *Model_Space: owner de todas las entidades en modelspace.
+// ezdxf R2010 usa consistentemente '17'. Detectamos dinámicamente por seguridad.
+const DXF_MODEL_OWNER = (()=>{
+  const lines = DXF_BOILERPLATE.split('\n');
+  for(let i=1;i<lines.length;i++){
+    // Buscar '*Model_Space' precedido por '  2' (inmediatamente antes)
+    if(lines[i].trim()==='*Model_Space' && lines[i-1].trim()==='2'){
+      // Buscar '  5' (handle) hacia atrás en los 15 registros anteriores
+      for(let j=i-1;j>Math.max(0,i-20);j--){
+        if(lines[j].trim()==='5') return lines[j+1].trim();
+      }
+    }
+  }
+  return '17'; // fallback ezdxf R2010
+})();
+
+async function buildDXF(contours, buildPts, vegPts, parcelEnts=[], measurePts=[], measureClosed=false) {
+  // Generador de handles secuenciales (sin colisión con boilerplate)
+  let hSeq = 0x5000;
+  const nextH = () => (hSeq++).toString(16).toUpperCase();
+  const smp = (a,m) => a.length<=m ? a : a.filter((_,i)=>i%Math.ceil(a.length/m)===0);
+
+  const entLines = [];
+  const g = (code, val) => { entLines.push(String(code)); entLines.push(String(val)); };
+
+  // ── ENTITIES — async con yield cada 50 niveles ───────────────
+  let li = 0;
+  const nLev = contours.length;
+  for (const {zlev, polys} of contours) {
+    const master = (li % 5 === 0);
+    const layer  = master ? 'CURVAS-MAESTRAS' : 'CURVAS-NORMALES';
+    for (const poly of polys) {
+      if (poly.length < 2) continue;
+      // LWPOLYLINE — Z una sola vez como elevation (code 38)
+      g('  0','LWPOLYLINE');
+      g('  5', nextH()); g('330', DXF_MODEL_OWNER);
+      g('100','AcDbEntity'); g('  8', layer);
+      g('100','AcDbPolyline');
+      g(' 90', poly.length); g(' 70', 0); g(' 38', zlev.toFixed(4));
+      for (const [x,y] of poly) { g(' 10', x.toFixed(3)); g(' 20', y.toFixed(3)); }
+      // TEXT — subclase AcDbText aparece dos veces (spec DXF R2000+)
+      const [tx,ty] = poly[0];
+      g('  0','TEXT');
+      g('  5', nextH()); g('330', DXF_MODEL_OWNER);
+      g('100','AcDbEntity'); g('  8','COTAS-TEXTO');
+      g('100','AcDbText');
+      g(' 10', tx.toFixed(3)); g(' 20', ty.toFixed(3)); g(' 30', zlev.toFixed(3));
+      g(' 40','0.5'); g('  1', zlev.toFixed(2));
+      g('100','AcDbText');  // segunda vez — obligatorio
+    }
+    li++;
+    // Yield cada 50 niveles para no bloquear el hilo
+    if (li % 50 === 0) {
+      setProgress(Math.round(li/nLev*70), `DXF: nivel ${li}/${nLev}…`);
+      await new Promise(r => setTimeout(r, 0));
+    }
+  }
+
+  // Puntos de edificación
+  for (const p of smp(buildPts, 5000)) {
+    g('  0','POINT'); g('  5',nextH()); g('330',DXF_MODEL_OWNER);
+    g('100','AcDbEntity'); g('  8','EDIFICACION');
+    g('100','AcDbPoint');
+    g(' 10',p.x.toFixed(3)); g(' 20',p.y.toFixed(3)); g(' 30',p.z.toFixed(3));
+  }
+
+  // Parcelas de catastro → LWPOLYLINE en capa dedicada
+  for (const e of parcelEnts) {
+    if(e.pts.length<2) continue;
+    g('  0','LWPOLYLINE'); g('  5',nextH()); g('330',DXF_MODEL_OWNER);
+    g('100','AcDbEntity'); g('  8','PARCELAS-CATASTRO');
+    g('100','AcDbPolyline');
+    g(' 90',e.pts.length); g(' 70',e.closed?1:0);
+    // LWPOLYLINE sin elevation — las parcelas son 2D de catastro
+    for(const p of e.pts){g(' 10',p.x.toFixed(3)); g(' 20',p.y.toFixed(3));}
+  }
+
+  // Puntos de vegetación
+  for (const p of smp(vegPts, 5000)) {
+    g('  0','POINT'); g('  5',nextH()); g('330',DXF_MODEL_OWNER);
+    g('100','AcDbEntity'); g('  8','VEGETACION');
+    g('100','AcDbPoint');
+    g(' 10',p.x.toFixed(3)); g(' 20',p.y.toFixed(3)); g(' 30',p.z.toFixed(3));
+  }
+
+  // Calcular extensión real de todos los datos (necesario antes de etiquetas de medición)
+  let xmin2=Infinity,xmax2=-Infinity,ymin2=Infinity,ymax2=-Infinity,zmin2=Infinity,zmax2=-Infinity;
+  const trk=(x,y,z)=>{
+    if(x<xmin2)xmin2=x;if(x>xmax2)xmax2=x;
+    if(y<ymin2)ymin2=y;if(y>ymax2)ymax2=y;
+    if(!isNaN(z)&&isFinite(z)){if(z<zmin2)zmin2=z;if(z>zmax2)zmax2=z;}
+  };
+  for(const{polys,zlev}of contours)for(const poly of polys)for(const[x,y]of poly)trk(x,y,zlev);
+  for(const p of buildPts)trk(p.x,p.y,p.z);
+  for(const p of vegPts)trk(p.x,p.y,p.z);
+  for(const e of parcelEnts)for(const p of e.pts)trk(p.x,p.y,NaN);
+  for(const p of measurePts)trk(p.x,p.y,p.z||NaN);
+  if(!isFinite(xmin2)){xmin2=0;xmax2=1;ymin2=0;ymax2=1;}
+  if(!isFinite(zmin2)){zmin2=0;zmax2=0;}
+  const pad=Math.max((xmax2-xmin2),(ymax2-ymin2))*0.02||1;
+  const extSpan=Math.max(xmax2-xmin2,ymax2-ymin2)||100;
+
+  // Líneas de medición → LWPOLYLINE + etiquetas de distancia y desnivel
+  if(measurePts && measurePts.length>=2){
+    // Tamaño de texto proporcional a la extensión del dibujo
+    const tSize=(extSpan*0.004).toFixed(3);   // ~0.4% de la extensión
+    const tOff= (extSpan*0.003);              // offset etiqueta respecto al segmento
+
+    // Polilínea principal
+    g('  0','LWPOLYLINE'); g('  5',nextH()); g('330',DXF_MODEL_OWNER);
+    g('100','AcDbEntity'); g('  8','MEDICION');
+    g('100','AcDbPolyline');
+    g(' 90',measurePts.length); g(' 70',measureClosed?1:0);
+    for(const p of measurePts){g(' 10',p.x.toFixed(3)); g(' 20',p.y.toFixed(3));}
+
+    // Por cada vértice: punto + etiqueta con coordenadas y cota
+    for(let i=0;i<measurePts.length;i++){
+      const p=measurePts[i];
+      g('  0','POINT'); g('  5',nextH()); g('330',DXF_MODEL_OWNER);
+      g('100','AcDbEntity'); g('  8','MEDICION');
+      g('100','AcDbPoint');
+      g(' 10',p.x.toFixed(3)); g(' 20',p.y.toFixed(3)); g(' 30',isNaN(p.z)?'0':p.z.toFixed(3));
+
+      // Etiqueta del punto (izquierda, sin justificación especial)
+      const zStr=isNaN(p.z)?'':(` Z=${p.z.toFixed(2)}m`);
+      const ptLabel=`P${i+1}  X=${p.x.toFixed(2)} Y=${p.y.toFixed(2)}${zStr}`;
+      g('  0','TEXT'); g('  5',nextH()); g('330',DXF_MODEL_OWNER);
+      g('100','AcDbEntity'); g('  8','MEDICION-TEXTO');
+      g('100','AcDbText');
+      g(' 10',(p.x+tOff).toFixed(3)); g(' 20',(p.y+tOff).toFixed(3)); g(' 30','0');
+      g(' 40',tSize); g('  1',ptLabel);
+      g('100','AcDbText');
+    }
+
+    // Por cada segmento: etiqueta de distancia y desnivel en el punto medio
+    for(let i=1;i<measurePts.length;i++){
+      const a=measurePts[i-1], b=measurePts[i];
+      const dx=b.x-a.x, dy=b.y-a.y;
+      const dist=Math.sqrt(dx*dx+dy*dy);
+      const len=dist||1;
+      // Desplazar la etiqueta perpendicularmente al segmento
+      const nx=-dy/len*tOff*2, ny=dx/len*tOff*2;
+      const lx=(a.x+b.x)/2+nx, ly=(a.y+b.y)/2+ny;
+      // Ángulo del segmento (DXF: grados CCW desde eje X)
+      let ang=(Math.atan2(dy,dx)*180/Math.PI);
+      // Mantener texto legible (no al revés)
+      if(ang>90||ang<=-90) ang+=180;
+      ang=((ang%360)+360)%360;
+
+      let segLabel=`${dist.toFixed(2)}m`;
+      if(!isNaN(a.z)&&!isNaN(b.z)){
+        const dz=b.z-a.z;
+        segLabel+=`  dz=${dz>0?'+':''}${dz.toFixed(2)}m`;
+        if(dist>0) segLabel+=`  (${(Math.abs(dz)/dist*100).toFixed(1)}%)`;
+      }
+      g('  0','TEXT'); g('  5',nextH()); g('330',DXF_MODEL_OWNER);
+      g('100','AcDbEntity'); g('  8','MEDICION-TEXTO');
+      g('100','AcDbText');
+      g(' 10',lx.toFixed(3)); g(' 20',ly.toFixed(3)); g(' 30','0');
+      g(' 40',tSize); g('  1',segLabel); g(' 50',ang.toFixed(2));
+      g('100','AcDbText');
+    }
+
+    // Etiqueta de area en el centroide si hay 3+ puntos
+    if(measurePts.length>=3){
+      let area=0; const n=measurePts.length;
+      let cx=0,cy=0;
+      for(let i=0;i<n;i++){const j=(i+1)%n;area+=measurePts[i].x*measurePts[j].y-measurePts[j].x*measurePts[i].y;cx+=measurePts[i].x;cy+=measurePts[i].y;}
+      area=Math.abs(area)/2; cx/=n; cy/=n;
+      const areaStr=area>=10000?`${(area/10000).toFixed(4)} ha`:`${area.toFixed(2)} m2`;
+      g('  0','TEXT'); g('  5',nextH()); g('330',DXF_MODEL_OWNER);
+      g('100','AcDbEntity'); g('  8','MEDICION-TEXTO');
+      g('100','AcDbText');
+      g(' 10',cx.toFixed(3)); g(' 20',cy.toFixed(3)); g(' 30','0');
+      g(' 40',(parseFloat(tSize)*1.4).toFixed(3)); g('  1',`Area=${areaStr}`);
+      g('100','AcDbText');
+    }
+  }
+
+  // Ensamblar con extensiones reales inyectadas en el boilerplate
+  const boilerplate = DXF_BOILERPLATE
+    .replace('__EXTMINX__',(xmin2-pad).toFixed(3))
+    .replace('__EXTMINY__',(ymin2-pad).toFixed(3))
+    .replace('__EXTMINZ__', zmin2.toFixed(3))
+    .replace('__EXTMAXX__',(xmax2+pad).toFixed(3))
+    .replace('__EXTMAXY__',(ymax2+pad).toFixed(3))
+    .replace('__EXTMAXZ__', zmax2.toFixed(3))
+    .replace('__LIMMINX__','0.0')
+    .replace('__LIMMINY__','0.0')
+    .replace('__LIMMAXX__','420.0')
+    .replace('__LIMMAXY__','297.0');
+
+  const entSection =
+    '  0\nSECTION\n  2\nENTITIES\n' +
+    entLines.join('\n') + '\n' +
+    '  0\nENDSEC\n';
+
+  return boilerplate + '\n' + entSection + DXF_OBJECTS;
+}
+
+
+
+// ══════════════════════════════════════════════
+// CANVAS TOOLS — RECORTE RECT, RECORTE POLI, MEDICIÓN
+// ══════════════════════════════════════════════
+const canvas=document.getElementById('preview-canvas');
+const ctx=canvas.getContext('2d');
+
+function w2c(wx,wy){return[S.vox+(wx-S.bounds.xmin)*S.vs,S.cH-S.voy-(wy-S.bounds.ymin)*S.vs];}
+function c2w(cx,cy){return[S.bounds.xmin+(cx-S.vox)/S.vs,S.bounds.ymin+(S.cH-S.voy-cy)/S.vs];}
+
+function setupView(bounds){
+  const wrap=document.getElementById('cv-wrap');
+  const W=wrap.clientWidth,H=wrap.clientHeight;
+  canvas.width=W;canvas.height=H;S.cW=W;S.cH=H;
+  const{xmin,xmax,ymin,ymax}=bounds,pad=S.vpad;
+  const sx=(W-pad*2)/(xmax-xmin),sy=(H-pad*2)/(ymax-ymin);
+  S.vs=Math.min(sx,sy);
+  S.vox=pad+(W-pad*2-(xmax-xmin)*S.vs)/2;
+  S.voy=pad+(H-pad*2-(ymax-ymin)*S.vs)/2;
+}
+
+function fmtDist(m){return m>=1000?(m/1000).toFixed(3)+' km':m.toFixed(2)+' m';}
+
+function redraw(){
+  if(!S.bounds)return;
+  const W=S.cW,H=S.cH;
+  ctx.fillStyle='#080a09';ctx.fillRect(0,0,W,H);
+
+  // 1. Puntos preview O curvas resultado
+  if(S.contours.length>0){
+    S.contours.forEach(({polys},idx)=>{
+      const master=idx%5===0;
+      ctx.strokeStyle=master?'#e8a020':'rgba(62,207,106,.85)';
+      ctx.lineWidth=master?1.8:.9;
+      for(const poly of polys){
+        if(poly.length<2)continue;
+        ctx.beginPath();
+        const[x0,y0]=w2c(poly[0][0],poly[0][1]);ctx.moveTo(x0,y0);
+        for(let i=1;i<poly.length;i++){const[x,y]=w2c(poly[i][0],poly[i][1]);ctx.lineTo(x,y);}
+        ctx.stroke();
+      }
+    });
+    ctx.fillStyle='rgba(232,80,80,.9)';
+    for(const p of S.buildPts){const[x,y]=w2c(p.x,p.y);ctx.fillRect(x-1.5,y-1.5,3,3);}
+    ctx.fillStyle='rgba(74,180,232,.7)';
+    for(const p of S.vegPts){const[x,y]=w2c(p.x,p.y);ctx.fillRect(x-.5,y-.5,1,1);}
+  } else if(S.previewPts){
+    const visible=S.previewPts.filter(p=>S.selectedCls.has(p.c));
+    const sz=Math.max(.5,Math.min(2.5,80000/Math.max(1,visible.length)));
+    for(const p of visible){
+      const[cx,cy]=w2c(p.x,p.y);ctx.fillStyle=ci(p.c).c;
+      ctx.fillRect(cx-sz/2,cy-sz/2,sz,sz);
+    }
+  }
+
+  // 2. Parcelas DXF
+  if(S.dxfParcels && S.dxfParcels.length){
+    ctx.save();
+    ctx.strokeStyle='#f97316';ctx.lineWidth=1.5;
+    ctx.shadowColor='rgba(249,115,22,.4)';ctx.shadowBlur=3;
+    const PAD=5000;const W2=S.cW+PAD,H2=S.cH+PAD;
+    for(const e of S.dxfParcels){
+      if(e.pts.length<2)continue;
+      ctx.beginPath();let started=false;
+      for(const p of e.pts){
+        const[cx,cy]=w2c(p.x,p.y);
+        if(!isFinite(cx)||!isFinite(cy))continue;
+        if(cx<-PAD||cx>W2||cy<-PAD||cy>H2){started=false;ctx.moveTo(cx,cy);continue;}
+        if(!started){ctx.moveTo(cx,cy);started=true;}else ctx.lineTo(cx,cy);
+      }
+      if(e.closed)ctx.closePath();ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  // 3. Recorte rectangular
+  const rectCrop=(S.cropDrag?.tmp)||(!S.cropPoly?S.crop:null);
+  if(rectCrop){
+    const[cx1,cy1]=w2c(rectCrop.x1,rectCrop.y1),[cx2,cy2]=w2c(rectCrop.x2,rectCrop.y2);
+    const rx=Math.min(cx1,cx2),ry=Math.min(cy1,cy2),rw=Math.abs(cx2-cx1),rh=Math.abs(cy2-cy1);
+    ctx.save();ctx.setLineDash([5,3]);
+    ctx.strokeStyle='rgba(176,108,219,.9)';ctx.lineWidth=2;ctx.strokeRect(rx,ry,rw,rh);
+    ctx.fillStyle='rgba(176,108,219,.1)';ctx.fillRect(rx,ry,rw,rh);
+    ctx.restore();
+  }
+
+  // 4. Recorte poligonal (guardado o en construcción)
+  const polyPts=S.cropPolyPts.length?S.cropPolyPts:(S.cropPoly||[]);
+  if(polyPts.length>=2){
+    ctx.save();ctx.setLineDash([5,3]);
+    ctx.strokeStyle='rgba(176,108,219,.9)';ctx.lineWidth=2;
+    ctx.fillStyle='rgba(176,108,219,.1)';
+    ctx.beginPath();
+    const[px0,py0]=w2c(polyPts[0].x,polyPts[0].y);ctx.moveTo(px0,py0);
+    for(let i=1;i<polyPts.length;i++){const[px,py]=w2c(polyPts[i].x,polyPts[i].y);ctx.lineTo(px,py);}
+    if(S.cropPoly||S.cropPolyPts.length===0)ctx.closePath();
+    ctx.fill();ctx.stroke();
+    // Vértices
+    ctx.setLineDash([]);ctx.fillStyle='rgba(176,108,219,.9)';
+    for(const p of polyPts){const[px,py]=w2c(p.x,p.y);ctx.beginPath();ctx.arc(px,py,4,0,Math.PI*2);ctx.fill();}
+    ctx.restore();
+  }
+
+  // 6. Marcador de búsqueda de coordenadas
+  if(S._searchMarker){
+    const[mx,my]=w2c(S._searchMarker.x,S._searchMarker.y);
+    const age=(Date.now()-S._searchMarker.t)/2000;
+    const alpha=1-age;
+    ctx.save();
+    ctx.strokeStyle=`rgba(232,160,32,${alpha})`;ctx.lineWidth=2;
+    const r=8+age*12;
+    ctx.beginPath();ctx.arc(mx,my,r,0,Math.PI*2);ctx.stroke();
+    ctx.fillStyle=`rgba(232,160,32,${alpha*0.8})`;
+    ctx.beginPath();ctx.arc(mx,my,4,0,Math.PI*2);ctx.fill();
+    // Crosshair
+    ctx.beginPath();ctx.moveTo(mx-14,my);ctx.lineTo(mx+14,my);ctx.stroke();
+    ctx.beginPath();ctx.moveTo(mx,my-14);ctx.lineTo(mx,my+14);ctx.stroke();
+    ctx.restore();
+  }
+  // 5. Herramienta de medición
+  const mpts=S.measurePts;
+  if(mpts.length>0){
+    ctx.save();
+    // Líneas
+    ctx.strokeStyle='#fbbf24';ctx.lineWidth=1.5;ctx.setLineDash([4,3]);
+    ctx.beginPath();
+    const[mx0,my0]=w2c(mpts[0].x,mpts[0].y);ctx.moveTo(mx0,my0);
+    for(let i=1;i<mpts.length;i++){const[mx,my]=w2c(mpts[i].x,mpts[i].y);ctx.lineTo(mx,my);}
+    if(S.measureClosed&&mpts.length>2)ctx.closePath();
+    ctx.stroke();
+    ctx.setLineDash([]);
+    // Puntos y etiquetas de distancia
+    for(let i=0;i<mpts.length;i++){
+      const[mx,my]=w2c(mpts[i].x,mpts[i].y);
+      ctx.fillStyle='#fbbf24';ctx.beginPath();ctx.arc(mx,my,4,0,Math.PI*2);ctx.fill();
+      // Etiqueta segmento
+      if(i>0){
+        const prev=mpts[i-1];
+        const dx=mpts[i].x-prev.x,dy=mpts[i].y-prev.y;
+        const dist=Math.sqrt(dx*dx+dy*dy);
+        const[lx,ly]=w2c((mpts[i].x+prev.x)/2,(mpts[i].y+prev.y)/2);
+        ctx.fillStyle='rgba(6,8,7,.75)';
+        const lbl=fmtDist(dist)+(isNaN(mpts[i].z)||isNaN(prev.z)?'':` Δz${(mpts[i].z-prev.z>0?'+':'')+(mpts[i].z-prev.z).toFixed(2)}m`);
+        const tw=ctx.measureText(lbl).width+8;
+        ctx.fillRect(lx-tw/2,ly-10,tw,14);
+        ctx.fillStyle='#fbbf24';ctx.font='10px Share Tech Mono,monospace';ctx.textAlign='center';ctx.textBaseline='middle';
+        ctx.fillText(lbl,lx,ly-3);
+      }
+      // Número de punto
+      ctx.fillStyle='rgba(6,8,7,.75)';ctx.fillRect(mx+6,my-8,14,12);
+      ctx.fillStyle='#fbbf24';ctx.font='9px monospace';ctx.textAlign='center';ctx.textBaseline='middle';
+      ctx.fillText(i+1,mx+13,my-2);
+    }
+    ctx.restore();
+  }
+}
+
+// ── HERRAMIENTA activa ────────────────────────
+function setTool(t){
+  S.tool=t;S.cropDrag=null;S.cropPolyPts=[];
+  const cursors={cropRect:'crosshair',cropPoly:'crosshair',measure:'crosshair'};
+  canvas.style.cursor=cursors[t]||'default';
+  // Actualizar botones
+  ['btn-crop-rect','btn-crop-poly','btn-measure'].forEach(id=>{
+    const btn=document.getElementById(id);
+    if(btn)btn.classList.remove('active');
+  });
+  if(t==='cropRect')document.getElementById('btn-crop-rect').classList.add('active');
+  if(t==='cropPoly')document.getElementById('btn-crop-poly').classList.add('active');
+  if(t==='measure')document.getElementById('btn-measure').classList.add('active');
+  // Hints
+  const hint=document.getElementById('crop-hint');
+  if(t==='cropRect'){hint.style.display='block';hint.textContent='Haz clic y arrastra para definir el recorte rectangular.';}
+  else if(t==='cropPoly'){hint.style.display='block';hint.textContent='Clic para añadir vértices · Doble clic o clic dcho para cerrar.';}
+  else{hint.style.display='none';}
+}
+
+// ── Finalizar recorte poligonal ───────────────
+function finishPolyProp(){
+  if(S.cropPolyPts.length>=3){
+    S.cropPoly=S.cropPolyPts.slice();
+    const xs=S.cropPoly.map(p=>p.x),ys=S.cropPoly.map(p=>p.y);
+    S.crop={x1:Math.min(...xs),x2:Math.max(...xs),y1:Math.min(...ys),y2:Math.max(...ys)};
+    updateCropUI();
+  }
+  S.cropPolyPts=[];
+  setTool(null);
+  redraw();
+}
+
+// ── Actualizar panel de medición ──────────────
+function updateMeasureUI(){
+  const el=document.getElementById('measure-result');
+  const copyBtn=document.getElementById('measure-copy');
+  const pts=S.measurePts;
+  if(pts.length<1){el.style.display='none';copyBtn.style.display='none';return;}
+
+  // Build copyable plain text alongside HTML
+  let html='',plain='';
+
+  // Per-point coordinates
+  html+=`<span style="color:var(--muted);font-size:.58rem">PUNTOS</span><br>`;
+  for(let i=0;i<pts.length;i++){
+    const p=pts[i];
+    const zStr=isNaN(p.z)?'':` Z:${p.z.toFixed(2)}m`;
+    html+=`P${i+1}: <span style="color:var(--amber)">${p.x.toFixed(2)}, ${p.y.toFixed(2)}</span>${zStr}<br>`;
+    plain+=`P${i+1}: ${p.x.toFixed(2)}, ${p.y.toFixed(2)}${zStr}\n`;
+  }
+
+  if(pts.length>=2){
+    let totalDist=0;
+    for(let i=1;i<pts.length;i++){
+      const dx=pts[i].x-pts[i-1].x,dy=pts[i].y-pts[i-1].y;
+      totalDist+=Math.sqrt(dx*dx+dy*dy);
+    }
+    html+=`<br><span style="color:var(--muted);font-size:.58rem">MEDIDAS</span><br>`;
+    plain+=`\n--- MEDIDAS ---\n`;
+    html+=`<b>Dist. total:</b> ${fmtDist(totalDist)}<br>`;
+    plain+=`Dist. total: ${fmtDist(totalDist)}\n`;
+
+    const z0=pts[0].z,zLast=pts[pts.length-1].z;
+    if(!isNaN(z0)&&!isNaN(zLast)){
+      const dz=zLast-z0;
+      html+=`<b>Desnivel:</b> ${dz>0?'+':''}${dz.toFixed(2)} m<br>`;
+      plain+=`Desnivel: ${dz>0?'+':''}${dz.toFixed(2)} m\n`;
+      const slopeD=totalDist>0?Math.abs(Math.atan(dz/totalDist)*180/Math.PI):0;
+      html+=`<b>Pendiente:</b> ${slopeD.toFixed(1)}°<br>`;
+      plain+=`Pendiente: ${slopeD.toFixed(1)}°\n`;
+    }
+    if(pts.length>=3){
+      let area=0;const n=pts.length;
+      for(let i=0;i<n;i++){const j=(i+1)%n;area+=pts[i].x*pts[j].y-pts[j].x*pts[i].y;}
+      area=Math.abs(area)/2;
+      const areaStr=area>=10000?(area/10000).toFixed(4)+' ha':area.toFixed(2)+' m²';
+      html+=`<b>Área:</b> ${areaStr}<br>`;
+      plain+=`Área: ${areaStr}\n`;
+    }
+  }
+
+  S._measurePlain=plain;
+  el.style.display='block';el.innerHTML=html;
+  copyBtn.style.display='block';
+}
+
+// ── Canvas events ─────────────────────────────
+// Coord bar on mousemove (always when canvas loaded)
+canvas.addEventListener('mousemove',e=>{
+  if(!S.bounds)return;
+  const[wx,wy]=c2w(e.offsetX,e.offsetY);
+  const z=S.gd?gridZ(S.gd,wx,wy):NaN;
+  const xyEl=document.getElementById('coord-xy');
+  if(xyEl)xyEl.textContent=`X: ${wx.toFixed(2)}  Y: ${wy.toFixed(2)}${isNaN(z)?'':'  Z: '+z.toFixed(2)+' m'}`;
+  // Crop rect drag
+  if(S.tool==='cropRect'&&S.cropDrag){
+    const{sx,sy}=S.cropDrag;
+    S.cropDrag.tmp={x1:Math.min(sx,wx),x2:Math.max(sx,wx),y1:Math.min(sy,wy),y2:Math.max(sy,wy)};
+    redraw();
+    const lbl=document.getElementById('croplabel');
+    const dx=(S.cropDrag.tmp.x2-S.cropDrag.tmp.x1).toFixed(1),dy=(S.cropDrag.tmp.y2-S.cropDrag.tmp.y1).toFixed(1);
+    lbl.style.display='block';lbl.style.left=(e.offsetX+14)+'px';lbl.style.top=(e.offsetY+14)+'px';
+    lbl.textContent=`${dx} × ${dy} m`;
+  }
+});
+canvas.addEventListener('mouseleave',()=>{
+  const xyEl=document.getElementById('coord-xy');
+  if(xyEl)xyEl.textContent='—';
+});
+
+canvas.addEventListener('mousedown',e=>{
+  if(!S.bounds||!S.tool)return;
+  if(e.button!==0)return;
+  const[wx,wy]=c2w(e.offsetX,e.offsetY);
+  if(S.tool==='cropRect'){
+    S.cropDrag={sx:wx,sy:wy,tmp:null};
+  } else if(S.tool==='cropPoly'){
+    S.cropPolyPts.push({x:wx,y:wy});redraw();
+  } else if(S.tool==='measure'){
+    const z=gridZ(S.gd,wx,wy);
+    S.measurePts.push({x:wx,y:wy,z});
+    S.measureClosed=false;
+    updateMeasureUI();redraw();
+  }
+});
+
+canvas.addEventListener('mouseup',e=>{
+  if(S.tool==='cropRect'&&S.cropDrag){
+    const crop=S.cropDrag.tmp;S.cropDrag=null;
+    document.getElementById('croplabel').style.display='none';
+    if(!crop||(crop.x2-crop.x1)<1||(crop.y2-crop.y1)<1)return;
+    S.crop=crop;S.cropPoly=null;updateCropUI();setTool(null);redraw();
+  }
+});
+
+
+canvas.addEventListener('dblclick',e=>{
+  if(!S.tool)return;
+  if(S.tool==='cropPoly'){
+    // quitar el último punto añadido por el segundo click del dblclick
+    if(S.cropPolyPts.length>0)S.cropPolyPts.pop();
+    finishPolyProp();
+  } else if(S.tool==='measure'){
+    // quitar duplicado del dblclick
+    if(S.measurePts.length>0)S.measurePts.pop();
+    S.measureClosed=S.measurePts.length>2;
+    updateMeasureUI();setTool(null);redraw();
+  }
+});
+
+canvas.addEventListener('contextmenu',e=>{
+  e.preventDefault();
+  if(S.tool==='cropPoly')finishPolyProp();
+  else if(S.tool==='measure'){S.measureClosed=S.measurePts.length>2;updateMeasureUI();setTool(null);redraw();}
+});
+
+document.addEventListener('keydown',e=>{
+  if(e.key==='Escape'){
+    if(S.tool){S.cropPolyPts=[];setTool(null);redraw();}
+  }
+});
+
+
+
+function updateCropUI(){
+  const info=document.getElementById('crop-info'),cb=document.getElementById('btn-crop-clear');
+  if(!S.crop&&!S.cropPoly){info.style.display='none';cb.disabled=true;return;}
+  cb.disabled=false;
+  if(S.cropPoly&&S.cropPoly.length>=3){
+    // Área del polígono
+    let area=0;const n=S.cropPoly.length;
+    for(let i=0;i<n;i++){const j=(i+1)%n;area+=S.cropPoly[i].x*S.cropPoly[j].y-S.cropPoly[j].x*S.cropPoly[i].y;}
+    area=Math.abs(area)/2;
+    const perim=S.cropPoly.reduce((s,p,i)=>{const q=S.cropPoly[(i+1)%n];return s+Math.sqrt((q.x-p.x)**2+(q.y-p.y)**2);},0);
+    const est=S.header?Math.round(S.header.nPts*(area/((S.bounds.xmax-S.bounds.xmin)*(S.bounds.ymax-S.bounds.ymin)))):0;
+    info.style.display='block';
+    info.innerHTML=`Polígono: <b>${n} vértices</b><br>Área: <b>${(area/10000).toFixed(3)} ha</b><br>Perímetro: <b>${perim.toFixed(1)} m</b><br>Puntos estimados: <b>~${fmtN(est)}</b>`;
+  } else if(S.crop){
+    const crop=S.crop;
+    const dx=(crop.x2-crop.x1).toFixed(1),dy=(crop.y2-crop.y1).toFixed(1);
+    const area=((crop.x2-crop.x1)*(crop.y2-crop.y1)/10000).toFixed(2);
+    const frac=S.header?((crop.x2-crop.x1)*(crop.y2-crop.y1))/((S.bounds.xmax-S.bounds.xmin)*(S.bounds.ymax-S.bounds.ymin)):0;
+    const est=S.header?Math.round(S.header.nPts*frac):0;
+    info.style.display='block';
+    info.innerHTML=`Recorte: <b>${dx} × ${dy} m</b><br>Área: <b>${area} ha</b><br>Puntos estimados: <b>~${fmtN(est)}</b>`;
+  }
+}
+
+// ══════════════════════════════════════════════
+// FLUJO PRINCIPAL
+// ══════════════════════════════════════════════
+async function onFile(file){
+  S.file=file;S.crop=null;S.cropPoly=null;S.cropPolyPts=[];
+  S.contours=[];S.buildPts=[];S.vegPts=[];S.gd=null;
+  S.measurePts=[];S.measureClosed=false;
+  S.history=[];updateUndoBtn();
+  setTool(null);
+  document.getElementById('hbtn-export').disabled=true;
+  showSecs(false);showProg(true);log(`Leyendo ${file.name} (${fmtB(file.size)})…`);
+  const hdrBuf=await file.slice(0,375).arrayBuffer();
+  let hdr;try{hdr=parseHeader(hdrBuf);}catch(e){alert(e.message);showProg(false);return;}
+  S.header=hdr;
+  const{xmin,xmax,ymin,ymax,zmin,zmax,nPts,version,ptFmt}=hdr;
+  S.bounds={xmin,xmax,ymin,ymax};
+
+  fillStats(hdr);setupView(S.bounds);
+  // Mostrar nombre de archivo cargado
+  document.getElementById('dropzone').style.display='none';
+  document.getElementById('las-loaded').style.display='flex';
+  document.getElementById('las-name').textContent=file.name;
+  document.getElementById('placeholder').style.display='none';
+  canvas.style.display='block';
+  document.getElementById('resolution').value=Math.max(.5,Math.min(5,1/Math.sqrt(nPts/((xmax-xmin)*(ymax-ymin)))*3)).toFixed(1);
+
+  const{pts,classCounts,step}=await loadPreview(file,hdr,70000);
+  S.previewPts=pts;S.classCounts=classCounts;
+  // buildClassUI primero — rellena S.selectedCls antes de dibujar
+  buildClassUI(classCounts);
+  document.getElementById('sample-note').textContent=`Mostrando 1/${step} de los puntos (${fmtN(pts.length)} de ${fmtN(nPts)})`;
+  showSecs(true);showProg(false);
+  redraw();  // ahora S.selectedCls ya tiene las clases correctas
+  document.getElementById('btn-process').disabled=false;
+  document.getElementById('legend').style.display='flex';
+  document.getElementById('infobar').style.display='block';
+  document.getElementById('infobar').textContent=`LAS ${version} · Fmt ${ptFmt} · ${fmtN(nPts)} pts · Z ${zmin.toFixed(1)}–${zmax.toFixed(1)} m`;
+  log(`Vista previa lista · ${Object.keys(classCounts).length} clases detectadas`);
+}
+
+async function runProcess(){
+  const equid=parseFloat(document.getElementById('equid').value);
+  const res=parseFloat(document.getElementById('resolution').value);
+  const smooth=parseInt(document.getElementById('smoothing').value);
+  if(isNaN(equid)||equid<=0||isNaN(res)||res<=0){alert('Parámetros inválidos');return;}
+  // Guardar estado antes de procesar (para poder deshacer)
+  if(S.contours.length>0||S.previewPts) saveHistory();
+  // Salir del modo herramienta si estaba activo
+  setTool(null); S.cropPolyPts=[]; S.measurePts=[]; S.measureClosed=false;
+  document.getElementById('measure-result').style.display='none';
+  document.getElementById('btn-process').disabled=true;
+  document.getElementById('hbtn-export').disabled=true;
+  S.contours=[];S.buildPts=[];S.vegPts=[];showProg(true);
+
+  let topoX,topoY,topoZ,edifPts,vegPts;
+  try{{({topoX,topoY,topoZ,edifPts,vegPts}=await loadFiltered(S.file,S.header,S.selectedCls,S.crop,S.cropPoly));}}
+  catch(e){alert(e.message);document.getElementById('btn-process').disabled=false;showProg(false);return;}
+
+  if(S.cropPoly&&S.cropPoly.length>=3){
+    const xs=S.cropPoly.map(p=>p.x),ys=S.cropPoly.map(p=>p.y);
+    S.bounds={xmin:Math.min(...xs),xmax:Math.max(...xs),ymin:Math.min(...ys),ymax:Math.max(...ys)};
+  } else if(S.crop){
+    S.bounds={xmin:S.crop.x1,xmax:S.crop.x2,ymin:S.crop.y1,ymax:S.crop.y2};
+  }
+  setupView(S.bounds);
+  updateResetViewBtn();await sl(20);
+
+  // ── Preflight: estimar tamaño de malla antes de construirla ──────────
+  if(topoX.length>0){
+    const xSpan = arrMax(topoX)-arrMin(topoX);
+    const ySpan = arrMax(topoY)-arrMin(topoY);
+    const estCells = Math.ceil(xSpan/res+2) * Math.ceil(ySpan/res+2);
+    const estLevels = S.header ? Math.ceil((S.header.zmax-S.header.zmin)/equid) : 0;
+    const CELL_LIMIT = 25e6;   // ~200 MB de Float64Array
+    const LEVEL_LIMIT = 5000;  // curvas de nivel razonables
+    if(estCells>CELL_LIMIT){
+      alert(`La malla requiere ~${(estCells/1e6).toFixed(1)}M celdas con resolución ${res} m.\n`+
+            `Aumenta la resolución (actualmente ${res} m) o reduce el área de recorte para continuar.\n`+
+            `Límite recomendado: ${(CELL_LIMIT/1e6).toFixed(0)}M celdas.`);
+      document.getElementById('btn-process').disabled=false;showProg(false);return;
+    }
+    if(estLevels>LEVEL_LIMIT){
+      alert(`Se generarían ~${estLevels} curvas de nivel con equidistancia ${equid} m.\n`+
+            `Aumenta la equidistancia para continuar.\n`+
+            `Límite recomendado: ${LEVEL_LIMIT} niveles.`);
+      document.getElementById('btn-process').disabled=false;showProg(false);return;
+    }
+  }
+
+  let gd;try{gd=buildGrid(topoX,topoY,topoZ,res);}
+  catch(e){alert(e.message);document.getElementById('btn-process').disabled=false;showProg(false);return;}
+  S.gd=gd;
+
+  setProgress(60,'Suavizando malla…');await sl(20);smoothGrid(gd,smooth);
+
+  // Rango Z de la malla — usando bucle para evitar stack overflow con arrays grandes
+  let zmin=Infinity,zmax=-Infinity;
+  for(let i=0;i<gd.grid.length;i++){
+    const v=gd.grid[i];
+    if(!isNaN(v)){if(v<zmin)zmin=v;if(v>zmax)zmax=v;}
+  }
+  let zlev=Math.ceil(zmin/equid)*equid;
+  const contours=[];let li=0,nL=Math.ceil((zmax-zmin)/equid)+1;
+
+  while(zlev<=zmax+1e-9){
+    const segs=march(gd,zlev);
+    if(segs.length>0)contours.push({zlev,polys:chain(segs,(gd.res*.05)**2)});
+    zlev+=equid;li++;
+    if(li%5===0){setProgress(65+li/nL*25,`Cota ${zlev.toFixed(1)} m…`);await sl(0);}
+  }
+  S.contours=contours;
+  const smp=(a,m)=>a.length<=m?a:a.filter((_,i)=>i%Math.ceil(a.length/m)===0);
+  S.buildPts=smp(edifPts,5000);S.vegPts=smp(vegPts,5000);
+
+  setProgress(96,'Dibujando…');await sl(20);
+  redraw();
+  const nP=contours.reduce((s,c)=>s+c.polys.length,0);
+  setProgress(100,`Listo: ${contours.length} niveles · ${nP} polilíneas`);
+  log(`${contours.length} niveles · ${nP} polilíneas · ${S.buildPts.length} edif · ${S.vegPts.length} veg`);
+  document.getElementById('btn-process').disabled=false;
+  document.getElementById('hbtn-export').disabled=false;
+}
+
+async function exportDXF(){
+  if(!S.contours.length){alert('Nada que exportar — genera las curvas primero.');return;}
+  const btn=document.getElementById('hbtn-export');
+  btn.disabled=true; btn.textContent='⏳ Generando DXF…';
+  showProg(true); setProgress(0,'Preparando DXF…');
+  await new Promise(r=>setTimeout(r,30)); // forzar repintado
+
+  try {
+    const dxf = await buildDXF(S.contours, S.buildPts, S.vegPts, S.dxfParcels||[], S.measurePts||[], S.measureClosed||false);
+    setProgress(90,'Creando archivo…'); await new Promise(r=>setTimeout(r,0));
+    const blob = new Blob([dxf], {type:'text/plain;charset=utf-8'});
+    setProgress(100,'Listo.');
+    const a=document.createElement('a');
+    a.href=URL.createObjectURL(blob);
+    a.download='topografia.dxf';
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(()=>URL.revokeObjectURL(a.href), 10000);
+    log(`DXF exportado · ${fmtB(blob.size)}`);
+  } catch(e) {
+    alert('Error generando DXF: ' + e.message);
+  } finally {
+    btn.disabled=false; btn.textContent='⬇  Exportar DXF';
+    showProg(false);
+  }
+}
+
+// ══════════════════════════════════════════════
+// UNDO (hasta 2 pasos)
+// ══════════════════════════════════════════════
+function saveHistory(){
+  // Guardar el estado actual ANTES de que runProcess lo modifique.
+  // Para bounds guardamos los del header (extent completo del archivo),
+  // así el undo siempre puede volver a la vista completa.
+  const fullBounds = S.header
+    ? {xmin:S.header.xmin,xmax:S.header.xmax,ymin:S.header.ymin,ymax:S.header.ymax}
+    : {...S.bounds};
+  const snap={
+    contours:S.contours, buildPts:S.buildPts, vegPts:S.vegPts,
+    bounds: fullBounds,
+    crop: S.crop ? {...S.crop} : null,
+    cropPoly: S.cropPoly ? S.cropPoly.slice() : null,
+    gd: S.gd,
+    previewPts:S.previewPts,
+  };
+  S.history.push(snap);
+  if(S.history.length>2) S.history.shift();
+  updateUndoBtn();
+}
+
+function undoStep(){
+  if(!S.history.length)return;
+  const snap=S.history.pop();
+  S.contours=snap.contours; S.buildPts=snap.buildPts; S.vegPts=snap.vegPts;
+  S.bounds=snap.bounds; S.previewPts=snap.previewPts;
+  S.crop=snap.crop; S.cropPoly=snap.cropPoly; S.gd=snap.gd;
+  S.cropDrag=null; S.cropPolyPts=[];
+  setTool(null);
+
+  setupView(S.bounds);
+  redraw();
+  updateCropUI();
+  updateResetViewBtn();
+  updateUndoBtn();
+
+  document.getElementById('hbtn-export').disabled=S.contours.length===0;
+  log(`Deshecho · ${S.contours.length?S.contours.length+' niveles restaurados':'vista previa restaurada'}`);
+}
+
+function updateUndoBtn(){
+  const btn=document.getElementById('hbtn-undo');
+  if(!btn)return;
+  const n=S.history.length;
+  btn.disabled=n===0;
+  btn.textContent=`↩  Deshacer (${n}/2)`;
+  btn.style.color=n>0?'var(--text)':'var(--muted)';
+  btn.style.borderColor=n>0?'var(--muted)':'var(--border)';
+}
+
+// ══════════════════════════════════════════════
+// UI HELPERS
+// ══════════════════════════════════════════════
+function fillStats(h){
+  document.getElementById('sgrid').innerHTML=
+    sv(fmtN(h.nPts),'Puntos totales')+sv(h.version,'Versión LAS')+
+    sv(`${h.zmin.toFixed(1)}–${h.zmax.toFixed(1)} m`,'Rango Z')+sv(`Fmt ${h.ptFmt}`,'Formato punto')+
+    sv(`${((h.xmax-h.xmin)/1000).toFixed(2)} km`,'Ancho X')+sv(`${((h.ymax-h.ymin)/1000).toFixed(2)} km`,'Alto Y');
+}
+const sv=(v,l)=>`<div class="sv"><span>${v}</span><span>${l}</span></div>`;
+
+function buildClassUI(counts){
+  const list=document.getElementById('clst');list.innerHTML='';S.selectedCls.clear();
+  for(const[cs,cnt]of Object.entries(counts).sort((a,b)=>b[1]-a[1])){
+    const c=parseInt(cs),info=ci(c);
+    if(info.r)S.selectedCls.add(c);
+    const el=document.createElement('div');
+    el.className='cli'+(info.r?' on':'');el.dataset.c=c;
+    el.innerHTML=`<div class="cd" style="background:${info.c}"></div>
+      <span class="cn">${info.n}</span><span class="cc">${fmtN(cnt)}</span>
+      ${info.r?`<span class="cb b${info.r}">${info.r==='t'?'TOPO':info.r==='e'?'EDIF':'VEG'}</span>`:''}`;
+    el.addEventListener('click',()=>{
+      if(S.selectedCls.has(c)){S.selectedCls.delete(c);el.classList.remove('on');}
+      else{S.selectedCls.add(c);el.classList.add('on');}
+      // Redibujar preview inmediatamente
+      if(S.contours.length===0 && S.previewPts) redraw();
+    });
+    list.appendChild(el);
+  }
+}
+
+function showSecs(show){
+  ['sec-preview','sec-crop','sec-measure','sec-classes','sec-params']
+    .forEach(id=>{const el=document.getElementById(id);if(el)el.style.display=show?'block':'none';});
+  const cb=document.getElementById('coordbar');
+  const cs=document.getElementById('coord-search');
+  if(cb)cb.style.display=show?'flex':'none';
+  if(cs)cs.style.display=show?'flex':'none';
+}
+function showProg(show){document.getElementById('prog-wrap').style.display=show?'block':'none';}
+function setProgress(pct,msg){document.getElementById('prog-bar').style.width=pct+'%';document.getElementById('prog-msg').textContent=msg;}
+function log(msg){const el=document.getElementById('logbar');el.style.display='block';el.textContent='▶ '+msg;}
+function fmtN(n){return n>=1e6?(n/1e6).toFixed(2)+'M':n>=1e3?(n/1e3).toFixed(1)+'K':String(n);}
+function fmtB(n){return n>=1e9?(n/1e9).toFixed(2)+' GB':n>=1e6?(n/1e6).toFixed(1)+' MB':(n/1e3).toFixed(0)+' KB';}
+function sl(ms){return new Promise(r=>setTimeout(r,ms));}
+
+// ══════════════════════════════════════════════
+// EVENTOS
+// ══════════════════════════════════════════════
+const dz=document.getElementById('dropzone'),fi=document.getElementById('file-input');
+dz.addEventListener('click',()=>fi.click());
+// stopPropagation evita que el global handler también reaccione
+dz.addEventListener('dragover',e=>{
+  if(e.dataTransfer&&e.dataTransfer.types.includes('Files')){
+    e.preventDefault();e.stopPropagation();dz.classList.add('over');}
+});
+dz.addEventListener('dragleave',()=>dz.classList.remove('over'));
+dz.addEventListener('drop',e=>{
+  e.preventDefault();e.stopPropagation();
+  dz.classList.remove('over');
+  if(e.dataTransfer&&e.dataTransfer.files[0]) onFile(e.dataTransfer.files[0]);
+});
+fi.addEventListener('change',e=>{if(e.target.files[0])onFile(e.target.files[0]);});
+
+// Capturar arrastre de archivos en TODA la página para .LAS
+// El handler distingue extensión: .las → onFile, .dxf → onDXFFile
+// stopPropagation en los dropzones específicos evita doble disparo,
+// pero como el document listener es el fallback necesitamos filtrar aquí.
+document.addEventListener('dragover', e=>{
+  if(e.dataTransfer && e.dataTransfer.types.includes('Files')){
+    e.preventDefault();
+    // Resaltar el dropzone apropiado según la posición del cursor
+    const overDz2 = document.getElementById('dropzone2').matches(':hover');
+    if(overDz2) dz2.classList.add('over');
+    else dz.classList.add('over');
+  }
+});
+document.addEventListener('dragleave', e=>{
+  if(e.clientX===0 && e.clientY===0){
+    dz.classList.remove('over');
+    dz2.classList.remove('over');
+  }
+});
+document.addEventListener('drop', e=>{
+  if(!e.dataTransfer || !e.dataTransfer.files[0]) return;
+  // Si ya fue manejado por un dropzone específico, ignorar
+  if(e.defaultPrevented) return;
+  e.preventDefault();
+  dz.classList.remove('over');
+  dz2.classList.remove('over');
+  const file = e.dataTransfer.files[0];
+  const ext  = file.name.split('.').pop().toLowerCase();
+  if(ext==='las')      onFile(file);
+  else if(ext==='dxf') onDXFFile(file);
+});
+
+document.getElementById('btn-process').addEventListener('click',runProcess);
+
+// ── Carga DXF de catastro ──────────────────────────────
+const dz2=document.getElementById('dropzone2'),fi2=document.getElementById('file-input2');
+dz2.addEventListener('click',()=>fi2.click());
+fi2.addEventListener('change',e=>{if(e.target.files[0])onDXFFile(e.target.files[0]);});
+dz2.addEventListener('dragover',e=>{
+  if(e.dataTransfer&&e.dataTransfer.types.includes('Files')){
+    e.preventDefault();e.stopPropagation();dz2.classList.add('over');dz.classList.remove('over');}
+});
+dz2.addEventListener('dragleave',()=>dz2.classList.remove('over'));
+dz2.addEventListener('drop',e=>{
+  e.preventDefault();e.stopPropagation();
+  dz2.classList.remove('over');
+  if(e.dataTransfer&&e.dataTransfer.files[0]) onDXFFile(e.dataTransfer.files[0]);
+});
+document.getElementById('btn-dxf-clear').addEventListener('click',()=>{
+  S.dxfParcels=[];
+  document.getElementById('dxf-status').style.display='none';
+  document.getElementById('dxf-info').style.display='none';
+  document.getElementById('legend-parcel').style.display='none';
+  redraw();
+});
+
+document.getElementById('btn-crop-rect').addEventListener('click',()=>{
+  if(S.tool==='cropRect')setTool(null); else setTool('cropRect');
+});
+document.getElementById('btn-crop-poly').addEventListener('click',()=>{
+  if(S.tool==='cropPoly')setTool(null); else{S.cropPolyPts=[];setTool('cropPoly');}
+});
+
+document.getElementById('btn-crop-clear').addEventListener('click',()=>{
+  S.crop=null;S.cropPoly=null;S.cropPolyPts=[];
+  setTool(null);
+  updateCropUI();
+  // Si hay un proceso hecho con recorte, mostrar botón de vista completa
+  updateResetViewBtn();
+  redraw();
+});
+
+document.getElementById('btn-reset-view').addEventListener('click',()=>{
+  if(!S.header)return;
+  // Guardar el proceso actual en el historial por si el usuario quiere deshacer
+  if(S.contours.length>0) saveHistory();
+  // Volver a la vista previa completa
+  S.bounds={xmin:S.header.xmin,xmax:S.header.xmax,ymin:S.header.ymin,ymax:S.header.ymax};
+  S.contours=[];S.buildPts=[];S.vegPts=[];S.gd=null;
+  S.crop=null;S.cropPoly=null;S.cropPolyPts=[];
+  setTool(null);
+  setupView(S.bounds);
+  updateCropUI();
+  updateResetViewBtn();
+  updateUndoBtn();
+  document.getElementById('hbtn-export').disabled=true;
+  redraw();
+  log('Vista previa completa · define un nuevo recorte y vuelve a procesar');
+});
+
+function updateResetViewBtn(){
+  const btn=document.getElementById('btn-reset-view');
+  if(!btn)return;
+  // Mostrar si los bounds actuales NO son los del archivo completo
+  const h=S.header;
+  const isFullView=!h||
+    (Math.abs(S.bounds.xmin-h.xmin)<1&&Math.abs(S.bounds.xmax-h.xmax)<1&&
+     Math.abs(S.bounds.ymin-h.ymin)<1&&Math.abs(S.bounds.ymax-h.ymax)<1);
+  btn.style.display=isFullView?'none':'block';
+}
+
+window.addEventListener('resize',()=>{if(S.bounds){setupView(S.bounds);redraw();}});
+document.getElementById('hbtn-undo').addEventListener('click',undoStep);
+document.getElementById('hbtn-export').addEventListener('click',exportDXF);
+
+// ── Copiar resultados de medición ─────────────
+document.getElementById('measure-copy').addEventListener('click',()=>{
+  if(!S._measurePlain)return;
+  navigator.clipboard.writeText(S._measurePlain).then(()=>{
+    const btn=document.getElementById('measure-copy');
+    btn.textContent='✓ Copiado';
+    setTimeout(()=>{btn.textContent='⎘ Copiar resultados';},1500);
+  });
+});
+
+// Limpiar medición al reiniciar herramienta
+document.getElementById('btn-measure').addEventListener('click',()=>{
+  if(S.tool==='measure'){setTool(null);}
+  else{
+    S.measurePts=[];S.measureClosed=false;S._measurePlain='';
+    document.getElementById('measure-result').style.display='none';
+    document.getElementById('measure-copy').style.display='none';
+    setTool('measure');
+  }
+  redraw();
+});
+
+// ── Las-loaded clear ──────────────────────────
+document.getElementById('las-clear').addEventListener('click',()=>{
+  S.file=null;S.header=null;S.previewPts=null;S.classCounts={};
+  S.crop=null;S.cropPoly=null;S.cropPolyPts=[];
+  S.contours=[];S.buildPts=[];S.vegPts=[];S.gd=null;
+  S.measurePts=[];S.bounds=null;S.history=[];
+  document.getElementById('las-loaded').style.display='none';
+  document.getElementById('dropzone').style.display='block';
+  document.getElementById('preview-canvas').style.display='none';
+  document.getElementById('placeholder').style.display='block';
+  document.getElementById('infobar').style.display='none';
+  document.getElementById('logbar').style.display='none';
+  document.getElementById('legend').style.display='none';
+  document.getElementById('coord-search').style.display='none';
+  showSecs(false);updateUndoBtn();
+  document.getElementById('hbtn-export').disabled=true;
+});
+
+// ── Buscador de coordenadas ───────────────────
+function goToCoord(){
+  if(!S.bounds)return;
+  const raw=document.getElementById('coord-input').value.trim();
+  const parts=raw.split(/[\s,;]+/);
+  if(parts.length<2)return;
+  const wx=parseFloat(parts[0]),wy=parseFloat(parts[1]);
+  if(isNaN(wx)||isNaN(wy)){alert('Coordenadas inválidas');return;}
+  // Centrar la vista en ese punto
+  const[cx,cy]=w2c(wx,wy);
+  // Flash del punto en el canvas
+  S._searchMarker={x:wx,y:wy,t:Date.now()};
+  redraw();
+  // Animar marcador
+  let frames=0;
+  const anim=()=>{
+    if(!S._searchMarker||Date.now()-S._searchMarker.t>2000){S._searchMarker=null;redraw();return;}
+    redraw();requestAnimationFrame(anim);
+  };
+  requestAnimationFrame(anim);
+  document.getElementById('coord-input').blur();
+}
+document.getElementById('coord-go').addEventListener('click',goToCoord);
+document.getElementById('coord-input').addEventListener('keydown',e=>{if(e.key==='Enter')goToCoord();});
+
+</script>
+</body>
+</html>
